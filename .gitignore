@@ -1,4 +1,24 @@
-.env
-__pycache__/
+# Ambiente virtual
 venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Banco 
+.env
+
+# Testes e cobertura
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Ferramentas
+.ruff_cache/
+.mypy_cache/
