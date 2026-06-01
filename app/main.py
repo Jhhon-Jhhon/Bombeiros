@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.routers import bombeiro
+from app.routers import bombeiro, viatura 
 
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
@@ -16,6 +17,7 @@ app = FastAPI(
 )
 
 app.include_router(bombeiro.router)
+app.include_router(viatura.router) 
 
 
 @app.get("/")
