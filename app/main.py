@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.routers import bombeiro
-from app.routers import bombeiro, viatura 
+from app.routers import bombeiro, viatura
+from app.routers import bombeiro, viatura, equipamento 
 
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
@@ -17,7 +18,8 @@ app = FastAPI(
 )
 
 app.include_router(bombeiro.router)
-app.include_router(viatura.router) 
+app.include_router(viatura.router)
+app.include_router(equipamento.router) 
 
 
 @app.get("/")
