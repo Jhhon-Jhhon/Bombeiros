@@ -9,7 +9,8 @@ from app.routers import bombeiro, viatura
 from app.routers import bombeiro, viatura, equipamento
 from app.routers import bombeiro, viatura, equipamento, ocorrencia
 from app.routers import bombeiro, viatura, equipamento, ocorrencia, manutencao
-from app.routers import bombeiro, viatura, equipamento, ocorrencia, manutencao, treinamento 
+from app.routers import bombeiro, viatura, equipamento, ocorrencia, manutencao, treinamento
+from app.routers import (bombeiro, viatura, equipamento, ocorrencia, manutencao, treinamento, denuncia, solicitacao ) 
 
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
@@ -26,6 +27,8 @@ app.include_router(equipamento.router)
 app.include_router(ocorrencia.router)
 app.include_router(manutencao.router)
 app.include_router(treinamento.router)
+app.include_router(denuncia.router)
+app.include_router(solicitacao.router) 
 
 
 
