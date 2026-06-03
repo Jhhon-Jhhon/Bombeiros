@@ -7,7 +7,8 @@ from app.core.logging_config import setup_logging
 from app.routers import bombeiro
 from app.routers import bombeiro, viatura
 from app.routers import bombeiro, viatura, equipamento
-from app.routers import bombeiro, viatura, equipamento, ocorrencia 
+from app.routers import bombeiro, viatura, equipamento, ocorrencia
+from app.routers import bombeiro, viatura, equipamento, ocorrencia, manutencao 
 
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
@@ -22,6 +23,7 @@ app.include_router(bombeiro.router)
 app.include_router(viatura.router)
 app.include_router(equipamento.router)
 app.include_router(ocorrencia.router)
+app.include_router(manutencao.router)
 
 
 @app.get("/")
