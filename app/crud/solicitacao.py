@@ -1,8 +1,10 @@
 import logging
 from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
-from app.models.solicitacao import Solicitacao
+
 from app.models.enums import StatusSolicitacao
+from app.models.solicitacao import Solicitacao
 from app.schemas.solicitacao import SolicitacaoCreate, SolicitacaoUpdate
 
 logger = logging.getLogger("bombeiros")

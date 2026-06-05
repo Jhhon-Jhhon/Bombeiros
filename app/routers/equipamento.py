@@ -1,14 +1,22 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.crud.equipamento import (
-    create_equipamento, delete_equipamento, get_equipamento,
-    get_equipamentos, get_equipamento_por_serie, update_equipamento,
+    create_equipamento,
+    delete_equipamento,
+    get_equipamento,
+    get_equipamento_por_serie,
+    get_equipamentos,
+    update_equipamento,
 )
 from app.database import get_db
 from app.models.enums import StatusEquipamento, TipoEquipamento
 from app.schemas.equipamento import (
-    EquipamentoCreate, EquipamentoResponse, EquipamentoUpdate,
+    EquipamentoCreate,
+    EquipamentoResponse,
+    EquipamentoUpdate,
 )
 
 logger = logging.getLogger("bombeiros")

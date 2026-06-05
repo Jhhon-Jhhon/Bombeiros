@@ -1,15 +1,15 @@
 """criar todas as tabelas
 
 Revision ID: 1c2826492546
-Revises: 
+Revises:
 Create Date: 2026-05-29 11:24:48.158290
 
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '1c2826492546'

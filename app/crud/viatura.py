@@ -1,7 +1,9 @@
 import logging
+
 from sqlalchemy.orm import Session
-from app.models.viatura import Viatura
+
 from app.models.enums import StatusViatura
+from app.models.viatura import Viatura
 from app.schemas.viatura import ViaturaCreate, ViaturaUpdate
 
 logger = logging.getLogger("bombeiros")

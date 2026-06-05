@@ -1,5 +1,5 @@
-from sqlalchemy import Column, DateTime, Enum as SAEnum
-from sqlalchemy import Integer, String
+from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

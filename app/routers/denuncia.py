@@ -1,9 +1,14 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.crud.denuncia import (
-    create_denuncia, delete_denuncia,
-    get_denuncia, get_denuncias, update_denuncia,
+    create_denuncia,
+    delete_denuncia,
+    get_denuncia,
+    get_denuncias,
+    update_denuncia,
 )
 from app.database import get_db
 from app.models.enums import StatusDenuncia

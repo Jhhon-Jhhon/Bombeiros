@@ -1,4 +1,3 @@
-import pytest
 
 
 BOMBEIRO_BASE = {

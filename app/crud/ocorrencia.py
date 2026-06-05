@@ -1,12 +1,20 @@
 import logging
+
 from sqlalchemy.orm import Session
+
+from app.models.enums import StatusOcorrencia, StatusViatura
 from app.models.ocorrencia import (
-    EnderecoOcorrencia, Ocorrencia, OcorrenciaBombeiro, OcorrenciaViatura
+    EnderecoOcorrencia,
+    Ocorrencia,
+    OcorrenciaBombeiro,
+    OcorrenciaViatura,
 )
 from app.models.viatura import Viatura
-from app.models.enums import StatusOcorrencia, StatusViatura
 from app.schemas.ocorrencia import (
-    AlocarBombeiroRequest, AlocarViaturaRequest, OcorrenciaCreate, OcorrenciaUpdate
+    AlocarBombeiroRequest,
+    AlocarViaturaRequest,
+    OcorrenciaCreate,
+    OcorrenciaUpdate,
 )
 
 logger = logging.getLogger("bombeiros")

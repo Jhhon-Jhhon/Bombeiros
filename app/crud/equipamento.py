@@ -1,7 +1,9 @@
 import logging
+
 from sqlalchemy.orm import Session
-from app.models.equipamento import Equipamento
+
 from app.models.enums import StatusEquipamento, TipoEquipamento
+from app.models.equipamento import Equipamento
 from app.schemas.equipamento import EquipamentoCreate, EquipamentoUpdate
 
 logger = logging.getLogger("bombeiros")

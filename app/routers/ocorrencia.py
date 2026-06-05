@@ -1,21 +1,31 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.crud.bombeiro import get_bombeiro
 from app.crud.ocorrencia import (
-    alocar_bombeiro, alocar_viatura, create_ocorrencia,
-    delete_ocorrencia, get_ocorrencia, get_ocorrencias,
-    get_viaturas_da_ocorrencia, update_ocorrencia,
+    alocar_bombeiro,
+    alocar_viatura,
+    create_ocorrencia,
+    delete_ocorrencia,
+    get_ocorrencia,
+    get_ocorrencias,
+    get_viaturas_da_ocorrencia,
+    update_ocorrencia,
     viatura_esta_em_atendimento,
 )
-from app.crud.bombeiro import get_bombeiro
 from app.crud.viatura import get_viatura
 from app.database import get_db
 from app.models.enums import StatusOcorrencia
 from app.schemas.ocorrencia import (
-    AlocarBombeiroRequest, AlocarViaturaRequest,
-    OcorrenciaBombeiroResponse, OcorrenciaCreate,
-    OcorrenciaResponse, OcorrenciaUpdate, OcorrenciaViaturaResponse,
+    AlocarBombeiroRequest,
+    AlocarViaturaRequest,
+    OcorrenciaBombeiroResponse,
+    OcorrenciaCreate,
+    OcorrenciaResponse,
+    OcorrenciaUpdate,
+    OcorrenciaViaturaResponse,
 )
 
 logger = logging.getLogger("bombeiros")

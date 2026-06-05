@@ -1,16 +1,26 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from app.crud.treinamento import (
-    create_treinamento, delete_treinamento, get_treinamento,
-    get_treinamentos, update_treinamento, inscrever_bombeiro, get_inscritos,
-)
+
 from app.crud.bombeiro import get_bombeiro
+from app.crud.treinamento import (
+    create_treinamento,
+    delete_treinamento,
+    get_inscritos,
+    get_treinamento,
+    get_treinamentos,
+    inscrever_bombeiro,
+    update_treinamento,
+)
 from app.database import get_db
 from app.models.enums import StatusTreinamento
 from app.schemas.treinamento import (
-    InscricaoRequest, InscricaoResponse,
-    TreinamentoCreate, TreinamentoResponse, TreinamentoUpdate,
+    InscricaoRequest,
+    InscricaoResponse,
+    TreinamentoCreate,
+    TreinamentoResponse,
+    TreinamentoUpdate,
 )
 
 logger = logging.getLogger("bombeiros")

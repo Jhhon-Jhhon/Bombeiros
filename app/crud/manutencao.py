@@ -1,7 +1,9 @@
 import logging
+
 from sqlalchemy.orm import Session
-from app.models.manutencao import Manutencao
+
 from app.models.enums import StatusManutencao
+from app.models.manutencao import Manutencao
 from app.schemas.manutencao import ManutencaoCreate, ManutencaoUpdate
 
 logger = logging.getLogger("bombeiros")

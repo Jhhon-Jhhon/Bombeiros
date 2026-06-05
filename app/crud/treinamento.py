@@ -1,8 +1,14 @@
 import logging
+
 from sqlalchemy.orm import Session
-from app.models.treinamento import BombeiroTreinamento, Treinamento
+
 from app.models.enums import StatusTreinamento
-from app.schemas.treinamento import InscricaoRequest, TreinamentoCreate, TreinamentoUpdate
+from app.models.treinamento import BombeiroTreinamento, Treinamento
+from app.schemas.treinamento import (
+    InscricaoRequest,
+    TreinamentoCreate,
+    TreinamentoUpdate,
+)
 
 logger = logging.getLogger("bombeiros")
 

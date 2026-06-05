@@ -1,6 +1,8 @@
 from datetime import date, datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, model_validator
+
 from app.models.enums import StatusManutencao, TipoManutencao
 
 

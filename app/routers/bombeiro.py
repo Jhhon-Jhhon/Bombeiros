@@ -1,4 +1,5 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -6,8 +7,8 @@ from app.crud.bombeiro import (
     create_bombeiro,
     delete_bombeiro,
     get_bombeiro,
-    get_bombeiros,
     get_bombeiro_por_matricula,
+    get_bombeiros,
     update_bombeiro,
 )
 from app.database import get_db

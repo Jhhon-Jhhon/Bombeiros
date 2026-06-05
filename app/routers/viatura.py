@@ -1,9 +1,15 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.crud.viatura import (
-    create_viatura, delete_viatura, get_viatura,
-    get_viaturas, get_viatura_por_placa, update_viatura,
+    create_viatura,
+    delete_viatura,
+    get_viatura,
+    get_viatura_por_placa,
+    get_viaturas,
+    update_viatura,
 )
 from app.database import get_db
 from app.models.enums import StatusViatura, TipoViatura

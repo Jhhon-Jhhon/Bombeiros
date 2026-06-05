@@ -1,5 +1,7 @@
 import logging
+
 from sqlalchemy.orm import Session
+
 from app.models.bombeiro import Bombeiro
 from app.models.enums import StatusBombeiro
 from app.schemas.bombeiro import BombeiroCreate, BombeiroUpdate

@@ -4,13 +4,16 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging
-from app.routers import bombeiro
-from app.routers import viatura
-from app.routers import equipamento
-from app.routers import ocorrencia
-from app.routers import manutencao
-from app.routers import treinamento
-from app.routers import (denuncia, solicitacao ) 
+from app.routers import (
+    bombeiro,
+    denuncia,
+    equipamento,
+    manutencao,
+    ocorrencia,
+    solicitacao,
+    treinamento,
+    viatura,
+)
 
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
@@ -28,7 +31,7 @@ app.include_router(ocorrencia.router)
 app.include_router(manutencao.router)
 app.include_router(treinamento.router)
 app.include_router(denuncia.router)
-app.include_router(solicitacao.router) 
+app.include_router(solicitacao.router)
 
 
 

@@ -1,5 +1,7 @@
 import logging
+
 from sqlalchemy.orm import Session
+
 from app.models.denuncia import Denuncia
 from app.models.enums import StatusDenuncia
 from app.schemas.denuncia import DenunciaCreate, DenunciaUpdate

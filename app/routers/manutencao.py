@@ -1,14 +1,21 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.crud.manutencao import (
-    create_manutencao, delete_manutencao, get_manutencao,
-    get_manutencoes, update_manutencao,
+    create_manutencao,
+    delete_manutencao,
+    get_manutencao,
+    get_manutencoes,
+    update_manutencao,
 )
 from app.database import get_db
 from app.models.enums import StatusManutencao
 from app.schemas.manutencao import (
-    ManutencaoCreate, ManutencaoResponse, ManutencaoUpdate,
+    ManutencaoCreate,
+    ManutencaoResponse,
+    ManutencaoUpdate,
 )
 
 logger = logging.getLogger("bombeiros")
