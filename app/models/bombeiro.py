@@ -1,4 +1,3 @@
-from datetime import date, datetime
 
 from sqlalchemy import Column, Date, DateTime, Enum as SAEnum
 from sqlalchemy import ForeignKey, Integer, String

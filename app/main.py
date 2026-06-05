@@ -5,12 +5,12 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.routers import bombeiro
-from app.routers import bombeiro, viatura
-from app.routers import bombeiro, viatura, equipamento
-from app.routers import bombeiro, viatura, equipamento, ocorrencia
-from app.routers import bombeiro, viatura, equipamento, ocorrencia, manutencao
-from app.routers import bombeiro, viatura, equipamento, ocorrencia, manutencao, treinamento
-from app.routers import (bombeiro, viatura, equipamento, ocorrencia, manutencao, treinamento, denuncia, solicitacao ) 
+from app.routers import viatura
+from app.routers import equipamento
+from app.routers import ocorrencia
+from app.routers import manutencao
+from app.routers import treinamento
+from app.routers import (denuncia, solicitacao ) 
 
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
