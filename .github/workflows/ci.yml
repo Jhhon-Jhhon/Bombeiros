@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: bombeiros_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Verificar formatação com Ruff
+        run: ruff check .
+
+      - name: Rodar testes com cobertura
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres123@localhost:5432/bombeiros_test
+          DATABASE_URL: postgresql://postgres:postgres123@localhost:5432/bombeiros_test
+          DEBUG: "False"
+        run: |
+          pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
