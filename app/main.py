@@ -8,6 +8,7 @@ from app.routers import (
     bombeiro,
     denuncia,
     equipamento,
+    equipe,
     manutencao,
     ocorrencia,
     solicitacao,
@@ -32,7 +33,7 @@ app.include_router(manutencao.router)
 app.include_router(treinamento.router)
 app.include_router(denuncia.router)
 app.include_router(solicitacao.router)
-
+app.include_router(equipe.router)
 
 
 @app.get("/")

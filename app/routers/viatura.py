@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.crud.equipamento import get_equipamento
 from app.crud.viatura import (
     create_viatura,
     delete_viatura,
@@ -11,9 +12,21 @@ from app.crud.viatura import (
     get_viaturas,
     update_viatura,
 )
+from app.crud.viatura_equipamento import (
+    associar_equipamento,
+    get_associacao,
+    get_equipamentos_viatura,
+    remover_associacao,
+    update_associacao,
+)
 from app.database import get_db
 from app.models.enums import StatusViatura, TipoViatura
 from app.schemas.viatura import ViaturaCreate, ViaturaResponse, ViaturaUpdate
+from app.schemas.viatura_equipamento import (
+    ViaturaEquipamentoCreate,
+    ViaturaEquipamentoResponse,
+    ViaturaEquipamentoUpdate,
+)
 
 logger = logging.getLogger("bombeiros")
 router = APIRouter(prefix="/viaturas", tags=["Viaturas"])
@@ -65,3 +78,84 @@ def remover_viatura(viatura_id: int, db: Session = Depends(get_db)):
     if not delete_viatura(db, viatura_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Viatura id={viatura_id} não encontrada")
+
+@router.post(
+    "/{viatura_id}/equipamentos",
+    response_model=ViaturaEquipamentoResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def associar_equipamento_viatura(
+    viatura_id: int,
+    dados: ViaturaEquipamentoCreate,
+    db: Session = Depends(get_db),
+):
+    """Associa um equipamento a uma viatura."""
+    if not get_viatura(db, viatura_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Viatura id={viatura_id} não encontrada",
+        )
+    if not get_equipamento(db, dados.equipamento_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Equipamento id={dados.equipamento_id} não encontrado",
+        )
+    if get_associacao(db, viatura_id, dados.equipamento_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Equipamento id={dados.equipamento_id} já está associado a esta viatura",
+        )
+    return associar_equipamento(db, viatura_id, dados)
+
+
+@router.get(
+    "/{viatura_id}/equipamentos",
+    response_model=list[ViaturaEquipamentoResponse],
+)
+def listar_equipamentos_viatura(
+    viatura_id: int, db: Session = Depends(get_db)
+):
+    """Lista todos os equipamentos de uma viatura."""
+    if not get_viatura(db, viatura_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Viatura id={viatura_id} não encontrada",
+        )
+    return get_equipamentos_viatura(db, viatura_id)
+
+
+@router.put(
+    "/{viatura_id}/equipamentos/{equipamento_id}",
+    response_model=ViaturaEquipamentoResponse,
+)
+def atualizar_equipamento_viatura(
+    viatura_id: int,
+    equipamento_id: int,
+    dados: ViaturaEquipamentoUpdate,
+    db: Session = Depends(get_db),
+):
+    """Atualiza quantidade ou observação de um equipamento na viatura."""
+    associacao = update_associacao(db, viatura_id, equipamento_id, dados)
+    if not associacao:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associação não encontrada",
+        )
+    return associacao
+
+
+@router.delete(
+    "/{viatura_id}/equipamentos/{equipamento_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remover_equipamento_viatura(
+    viatura_id: int,
+    equipamento_id: int,
+    db: Session = Depends(get_db),
+):
+    """Remove um equipamento de uma viatura."""
+    if not remover_associacao(db, viatura_id, equipamento_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associação não encontrada",
+        )
