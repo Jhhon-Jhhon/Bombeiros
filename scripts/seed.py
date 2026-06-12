@@ -57,8 +57,8 @@ def seed_bombeiros(db):
             matricula="CB-001",
             patente=PatenteBombeiro.capitao,
             especialidade="Comando e Gestão",
-            telefone="11999990001",
-            email="carlos.silva@bombeiros.sp.gov.br",
+            telefone="61999990001",
+            email="carlos.silva@bombeiros.df.gov.br",
             status=StatusBombeiro.ativo,
             data_admissao=date(2005, 3, 10),
         ),
@@ -67,8 +67,8 @@ def seed_bombeiros(db):
             matricula="CB-002",
             patente=PatenteBombeiro.tenente,
             especialidade="Combate a Incêndio",
-            telefone="11999990002",
-            email="ana.ferreira@bombeiros.sp.gov.br",
+            telefone="61999990002",
+            email="ana.ferreira@bombeiros.df.gov.br",
             status=StatusBombeiro.ativo,
             data_admissao=date(2012, 7, 15),
         ),
@@ -77,8 +77,8 @@ def seed_bombeiros(db):
             matricula="CB-003",
             patente=PatenteBombeiro.sargento,
             especialidade="Resgate em Altura",
-            telefone="11999990003",
-            email="roberto.costa@bombeiros.sp.gov.br",
+            telefone="61999990003",
+            email="roberto.costa@bombeiros.df.gov.br",
             status=StatusBombeiro.ativo,
             data_admissao=date(2015, 1, 20),
         ),
@@ -87,8 +87,8 @@ def seed_bombeiros(db):
             matricula="CB-004",
             patente=PatenteBombeiro.cabo,
             especialidade="Atendimento Pré-Hospitalar",
-            telefone="11999990004",
-            email="fernanda.santos@bombeiros.sp.gov.br",
+            telefone="61999990004",
+            email="fernanda.santos@bombeiros.df.gov.br",
             status=StatusBombeiro.ativo,
             data_admissao=date(2018, 9, 5),
         ),
@@ -97,8 +97,8 @@ def seed_bombeiros(db):
             matricula="CB-005",
             patente=PatenteBombeiro.soldado,
             especialidade="Combate a Incêndio",
-            telefone="11999990005",
-            email="marcos.pinto@bombeiros.sp.gov.br",
+            telefone="61999990005",
+            email="marcos.pinto@bombeiros.df.gov.br",
             status=StatusBombeiro.ativo,
             data_admissao=date(2021, 4, 12),
         ),
@@ -107,8 +107,8 @@ def seed_bombeiros(db):
             matricula="CB-006",
             patente=PatenteBombeiro.soldado,
             especialidade="Mergulho e Salvamento Aquático",
-            telefone="11999990006",
-            email="juliana.rocha@bombeiros.sp.gov.br",
+            telefone="61999990006",
+            email="juliana.rocha@bombeiros.df.gov.br",
             status=StatusBombeiro.de_folga,
             data_admissao=date(2020, 11, 30),
         ),
@@ -124,28 +124,28 @@ def seed_viaturas(db):
     print("🚒 Inserindo viaturas...")
     viaturas = [
         Viatura(
-            placa="SP-001-AB",
+            placa="DF-001-AB",
             modelo="Scania P360 AutoBomba",
             tipo=TipoViatura.auto_bomba,
             ano_fabricacao=2019,
             status=StatusViatura.disponivel,
         ),
         Viatura(
-            placa="SP-002-AB",
+            placa="DF-002-AB",
             modelo="Mercedes-Benz Atron AutoEscada",
             tipo=TipoViatura.auto_escada,
             ano_fabricacao=2021,
             status=StatusViatura.disponivel,
         ),
         Viatura(
-            placa="SP-003-AB",
+            placa="DF-003-AB",
             modelo="Mercedes-Benz Sprinter UTI",
             tipo=TipoViatura.ambulancia,
             ano_fabricacao=2022,
             status=StatusViatura.disponivel,
         ),
         Viatura(
-            placa="SP-004-AB",
+            placa="DF-004-AB",
             modelo="Toyota Hilux Veículo Leve",
             tipo=TipoViatura.veiculo_leve,
             ano_fabricacao=2020,
@@ -177,13 +177,13 @@ def seed_equipamentos(db):
         Equipamento(
             nome="Desfibrilador DEA",
             tipo=TipoEquipamento.medico,
-            numero_serie="DEA-001-SP",
+            numero_serie="DEA-001-DF",
             status=StatusEquipamento.disponivel,
         ),
         Equipamento(
             nome="Aparelho de Respiração Autônoma",
             tipo=TipoEquipamento.combate,
-            numero_serie="ARA-001-SP",
+            numero_serie="ARA-001-DF",
             status=StatusEquipamento.em_uso,
         ),
         Equipamento(
@@ -203,73 +203,121 @@ def seed_equipamentos(db):
 def seed_ocorrencias(db, viaturas, bombeiros):
     print("🚨 Inserindo ocorrências...")
 
+    # Aberta — incêndio crítico, sem data de encerramento
     oc1 = Ocorrencia(
         tipo=TipoOcorrencia.incendio,
-        descricao="Incêndio em edifício residencial de 8 andares",
+        descricao="Incêndio em transformador elétrico na Torre de TV",
         prioridade=PrioridadeOcorrencia.critica,
-        num_vitimas=2,
-        status=StatusOcorrencia.encerrada,
-        data_abertura=datetime(2026, 5, 10, 14, 30, tzinfo=timezone.utc),
-        data_encerramento=datetime(2026, 5, 10, 17, 45, tzinfo=timezone.utc),
+        num_vitimas=0,
+        status=StatusOcorrencia.aberta,
+        data_abertura=datetime(2026, 6, 12, 14, 30, tzinfo=timezone.utc),
     )
     db.add(oc1)
     db.flush()
     db.add(EnderecoOcorrencia(
         ocorrencia_id=oc1.id,
-        logradouro="Rua Augusta",
-        numero="1500",
-        bairro="Consolação",
-        cidade="São Paulo",
-        cep="01304-001",
-        latitude=-23.5541,
-        longitude=-46.6565,
+        logradouro="Eixo Monumental",
+        numero="s/n",
+        bairro="Setor de Divulgação Cultural",
+        cidade="Brasília",
+        cep="70070-350",
+        latitude=-15.7795,
+        longitude=-47.9292,
     ))
 
+    # Em andamento — acidente com vítimas, sem data de encerramento
     oc2 = Ocorrencia(
         tipo=TipoOcorrencia.acidente,
-        descricao="Colisão entre dois veículos com vítimas presas",
+        descricao="Colisão entre ônibus e automóvel com vítimas presas",
         prioridade=PrioridadeOcorrencia.alta,
-        num_vitimas=3,
-        status=StatusOcorrencia.aberta,
-        data_abertura=datetime(2026, 6, 3, 9, 15, tzinfo=timezone.utc),
+        num_vitimas=4,
+        status=StatusOcorrencia.em_andamento,
+        data_abertura=datetime(2026, 6, 12, 10, 15, tzinfo=timezone.utc),
     )
     db.add(oc2)
     db.flush()
     db.add(EnderecoOcorrencia(
         ocorrencia_id=oc2.id,
-        logradouro="Avenida Paulista",
-        numero="2300",
-        bairro="Bela Vista",
-        cidade="São Paulo",
-        cep="01310-300",
-        latitude=-23.5613,
-        longitude=-46.6563,
+        logradouro="SGAS 915",
+        numero="s/n",
+        bairro="Setor Hospitalar Sul",
+        cidade="Brasília",
+        cep="70390-150",
+        latitude=-15.7942,
+        longitude=-47.8982,
     ))
 
+    # Aberta — resgate aquático, sem data de encerramento
     oc3 = Ocorrencia(
         tipo=TipoOcorrencia.resgate,
-        descricao="Pessoa presa em elevador há mais de 2 horas",
+        descricao="Pessoa desaparecida no Lago Norte após acidente náutico",
         prioridade=PrioridadeOcorrencia.media,
         num_vitimas=1,
-        status=StatusOcorrencia.em_andamento,
-        data_abertura=datetime(2026, 6, 3, 11, 0, tzinfo=timezone.utc),
+        status=StatusOcorrencia.aberta,
+        data_abertura=datetime(2026, 6, 11, 8, 0, tzinfo=timezone.utc),
     )
     db.add(oc3)
     db.flush()
     db.add(EnderecoOcorrencia(
         ocorrencia_id=oc3.id,
-        logradouro="Rua da Consolação",
-        numero="800",
-        bairro="Higienópolis",
-        cidade="São Paulo",
-        cep="01301-000",
-        latitude=-23.5489,
-        longitude=-46.6488,
+        logradouro="QI 13",
+        numero="s/n",
+        bairro="Lago Norte",
+        cidade="Brasília",
+        cep="71535-130",
+        latitude=-15.7276,
+        longitude=-47.8824,
+    ))
+
+    # Encerrada — inundação, COM data_encerramento (duração: ~4h30)
+    oc4 = Ocorrencia(
+        tipo=TipoOcorrencia.inundacao,
+        descricao="Alagamento em via após chuvas intensas",
+        prioridade=PrioridadeOcorrencia.media,
+        num_vitimas=0,
+        status=StatusOcorrencia.encerrada,
+        data_abertura=datetime(2026, 6, 10, 18, 0, tzinfo=timezone.utc),
+        data_encerramento=datetime(2026, 6, 10, 22, 30, tzinfo=timezone.utc),
+    )
+    db.add(oc4)
+    db.flush()
+    db.add(EnderecoOcorrencia(
+        ocorrencia_id=oc4.id,
+        logradouro="QNN 31",
+        numero="s/n",
+        bairro="Ceilândia Norte",
+        cidade="Brasília",
+        cep="72215-310",
+        latitude=-15.8081,
+        longitude=-48.1101,
+    ))
+
+    # Encerrada — incêndio crítico, COM data_encerramento (duração: ~4h)
+    oc5 = Ocorrencia(
+        tipo=TipoOcorrencia.incendio,
+        descricao="Incêndio em estabelecimento comercial no centro de Taguatinga",
+        prioridade=PrioridadeOcorrencia.critica,
+        num_vitimas=2,
+        status=StatusOcorrencia.encerrada,
+        data_abertura=datetime(2026, 6, 9, 9, 0, tzinfo=timezone.utc),
+        data_encerramento=datetime(2026, 6, 9, 13, 0, tzinfo=timezone.utc),
+    )
+    db.add(oc5)
+    db.flush()
+    db.add(EnderecoOcorrencia(
+        ocorrencia_id=oc5.id,
+        logradouro="QSA 3",
+        numero="s/n",
+        bairro="Taguatinga Centro",
+        cidade="Brasília",
+        cep="72015-030",
+        latitude=-15.8327,
+        longitude=-48.0560,
     ))
 
     db.commit()
-    print("  ✅ 3 ocorrências inseridas")
-    return [oc1, oc2, oc3]
+    print("  ✅ 5 ocorrências inseridas")
+    return [oc1, oc2, oc3, oc4, oc5]
 
 
 def seed_manutencoes(db, viaturas, equipamentos):
@@ -332,18 +380,18 @@ def seed_denuncias(db):
     denuncias = [
         Denuncia(
             solicitante="Maria Aparecida dos Santos",
-            telefone="11988880001",
+            telefone="61988880001",
             tipo="incendio",
             descricao="Fumaça saindo de apartamento abandonado no 5º andar",
-            endereco_informado="Rua Vergueiro, 3000, Vila Mariana",
+            endereco_informado="SQN 210, Bloco B, Asa Norte",
             status=StatusDenuncia.em_analise,
         ),
         Denuncia(
             solicitante="João Carlos Pereira",
-            telefone="11988880002",
+            telefone="61988880002",
             tipo="inundacao",
             descricao="Bueiro entupido causando alagamento na via",
-            endereco_informado="Av. Rebouças, 500, Pinheiros",
+            endereco_informado="W3 Norte, 714, Asa Norte",
             status=StatusDenuncia.pendente,
         ),
     ]
