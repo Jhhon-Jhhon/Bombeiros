@@ -14,15 +14,12 @@ function inicializarSeletorPerfil() {
     btn.addEventListener('click', () => {
       const perfil = btn.dataset.profile;
 
-      // Atualiza botões
       botoes.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
 
-      // Atualiza views
       views.forEach((v) => v.classList.remove('active'));
       document.getElementById(`view-${perfil}`).classList.add('active');
 
-      // Recarrega conteúdo da view ativada
       if (perfil === 'comandante') carregarViewComandante();
       if (perfil === 'tecnico')    carregarViewTecnico();
       if (perfil === 'cidadao')    carregarViewCidadao();
@@ -38,7 +35,6 @@ async function carregarViewComandante() {
   await carregarKanbanOcorrencias();
   await carregarRecursosComandante();
 
-  // Atualiza pins do mapa sem recriar o mapa inteiro
   if (mapaOcorrencias) {
     mapaOcorrencias.eachLayer((layer) => {
       if (layer instanceof L.Marker) mapaOcorrencias.removeLayer(layer);
@@ -63,16 +59,13 @@ async function carregarRecursosComandante() {
     // Card de Bombeiros
     grid.appendChild(criarResourceCard('👨‍🚒 Bombeiros', bombeiros,
       [
-        { label: 'Nome',     key: 'nome' },
-        { label: 'Patente',  render: badgePatente },
-        { label: 'Status',   render: badgeStatusBombeiro },
+        { label: 'Nome',    key: 'nome' },
+        { label: 'Patente', render: badgePatente },
+        { label: 'Status',  render: badgeStatusBombeiro },
       ],
       {
-        onEditar:  (b) => abrirModalEditarBombeiro(b),
-        btnExtra: {
-          label: '+ Novo',
-          onClick: abrirModalNovoBombeiro,
-        },
+        onEditar: (b) => abrirModalEditarBombeiro(b),
+        btnExtra: { label: '+ Novo', onClick: abrirModalNovoBombeiro },
       }
     ));
 
@@ -99,13 +92,32 @@ async function carregarRecursosComandante() {
     // Card de Equipes
     grid.appendChild(criarResourceCard('👥 Equipes', equipes,
       [
-        { label: 'Nome',        key: 'nome' },
-        { label: 'Especialidade', key: 'especialidade' },
+        { label: 'Nome', key: 'nome' },
+        { label: 'Tipo', key: 'tipo' },
       ],
-      { onEditar: (eq) => abrirModalEditarEquipe(eq) }
+      {
+        onEditar: (eq) => abrirModalEditarEquipe(eq),
+        btnExtra: { label: '+ Nova', onClick: abrirModalNovaEquipe },
+      }
+    ));
+
+    // Card de Treinamentos
+    const treinamentos = await Treinamentos.listar();
+    grid.appendChild(criarResourceCard('🎓 Treinamentos', treinamentos,
+      [
+        { label: 'Título',    key: 'titulo' },
+        { label: 'Tipo',      key: 'tipo' },
+        { label: 'Status',    render: badgeStatusTreinamento },
+        { label: 'Instrutor', key: 'instrutor' },
+      ],
+      {
+        onEditar: (t) => abrirModalEditarTreinamento(t),
+        btnExtra: { label: '+ Novo', onClick: abrirModalNovoTreinamento },
+      }
     ));
 
   } catch (erro) {
+    console.error('Erro carregarRecursosComandante:', erro);
     showToast('Erro ao carregar recursos.', 'error');
   }
 }
@@ -218,9 +230,9 @@ function abrirModalEditarBombeiro(b) {
       <div class="form-group">
         <label>Status</label>
         <select id="b-status">
-          <option value="ativo"     ${b.status === 'ativo'     ? 'selected':''}>Ativo</option>
-          <option value="de_folga"  ${b.status === 'de_folga'  ? 'selected':''}>De folga</option>
-          <option value="inativo"   ${b.status === 'inativo'   ? 'selected':''}>Inativo</option>
+          <option value="ativo"    ${b.status === 'ativo'    ? 'selected':''}>Ativo</option>
+          <option value="de_folga" ${b.status === 'de_folga' ? 'selected':''}>De folga</option>
+          <option value="inativo"  ${b.status === 'inativo'  ? 'selected':''}>Inativo</option>
         </select>
       </div>
     </div>
@@ -258,10 +270,10 @@ async function criarBombeiro() {
 
 async function salvarBombeiro(id) {
   const dados = {
+    nome:          document.getElementById('b-nome').value,
     patente:       document.getElementById('b-patente').value,
     status:        document.getElementById('b-status').value,
     especialidade: document.getElementById('b-especialidade').value,
-    nome:          document.getElementById('b-nome').value,
   };
   try {
     await Bombeiros.atualizar(id, dados);
@@ -308,9 +320,9 @@ function abrirModalEditarViatura(v) {
       <div class="form-group">
         <label>Status</label>
         <select id="v-status">
-          <option value="disponivel"     ${v.status === 'disponivel'     ? 'selected':''}>Disponível</option>
-          <option value="em_manutencao"  ${v.status === 'em_manutencao'  ? 'selected':''}>Em manutenção</option>
-          <option value="inativa"        ${v.status === 'inativa'        ? 'selected':''}>Inativa</option>
+          <option value="disponivel"    ${v.status === 'disponivel'    ? 'selected':''}>Disponível</option>
+          <option value="em_manutencao" ${v.status === 'em_manutencao' ? 'selected':''}>Em manutenção</option>
+          <option value="inativa"       ${v.status === 'inativa'       ? 'selected':''}>Inativa</option>
         </select>
       </div>
     </div>
@@ -394,6 +406,42 @@ async function salvarEquipamento(id) {
 // MODAIS DO COMANDANTE — Equipe
 // =============================================
 
+function abrirModalNovaEquipe() {
+  openModal('Nova equipe', `
+    <div class="form-group">
+      <label>Nome</label>
+      <input type="text" id="eq-nome-equipe" placeholder="Ex: Equipe Alpha" />
+    </div>
+    <div class="form-group">
+      <label>Tipo</label>
+      <input type="text" id="eq-tipo-equipe" placeholder="Ex: combate, resgate, APH" />
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="criarEquipe()">Criar</button>
+    </div>
+  `);
+}
+
+async function criarEquipe() {
+  const dados = {
+    nome: document.getElementById('eq-nome-equipe').value,
+    tipo: document.getElementById('eq-tipo-equipe').value,
+  };
+  if (!dados.nome || !dados.tipo) {
+    showToast('Informe o nome e o tipo da equipe.', 'error');
+    return;
+  }
+  try {
+    await Equipes.criar(dados);
+    closeModal();
+    showToast('Equipe criada!', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
 function abrirModalEditarEquipe(eq) {
   openModal(`Equipe — ${eq.nome}`, `
     <div class="form-group">
@@ -401,11 +449,13 @@ function abrirModalEditarEquipe(eq) {
       <input type="text" id="eq-nome-equipe" value="${eq.nome}" />
     </div>
     <div class="form-group">
-      <label>Especialidade</label>
-      <input type="text" id="eq-especialidade" value="${eq.especialidade ?? ''}" />
+      <label>Tipo</label>
+      <input type="text" id="eq-tipo-equipe" value="${eq.tipo ?? ''}" />
     </div>
     <div class="form-actions">
+      <button class="btn-danger"    onclick="deletarEquipe(${eq.id})">Excluir</button>
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-secondary" onclick="abrirModalMembros(${eq.id}, '${eq.nome}')">👥 Membros</button>
       <button class="btn-primary"   onclick="salvarEquipe(${eq.id})">Salvar</button>
     </div>
   `);
@@ -413,13 +463,294 @@ function abrirModalEditarEquipe(eq) {
 
 async function salvarEquipe(id) {
   const dados = {
-    nome:          document.getElementById('eq-nome-equipe').value,
-    especialidade: document.getElementById('eq-especialidade').value,
+    nome: document.getElementById('eq-nome-equipe').value,
+    tipo: document.getElementById('eq-tipo-equipe').value,
   };
   try {
     await Equipes.atualizar(id, dados);
     closeModal();
     showToast('Equipe atualizada!', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
+async function deletarEquipe(id) {
+  if (!confirm('Excluir esta equipe?')) return;
+  try {
+    await Equipes.deletar(id);
+    closeModal();
+    showToast('Equipe excluída.', 'info');
+    await carregarRecursosComandante();
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
+// =============================================
+// MEMBROS DE EQUIPE
+// =============================================
+
+async function abrirModalMembros(equipeId, equipeNome) {
+  openModal(`Membros — ${equipeNome}`, '<div class="empty-state">Carregando...</div>');
+
+  try {
+    const [membros, bombeiros] = await Promise.all([
+      request('GET', `/equipes/${equipeId}/bombeiros`),
+      Bombeiros.listar(),
+    ]);
+
+    const idsAlocados = membros.map((m) => m.bombeiro_id);
+    const disponiveis = bombeiros.filter((b) => !idsAlocados.includes(b.id));
+
+    const listaMembros = membros.length > 0
+      ? membros.map((m) => {
+          const b = bombeiros.find((x) => x.id === m.bombeiro_id);
+          const nome = b ? b.nome : `Bombeiro #${m.bombeiro_id}`;
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;
+                        padding:8px 0;border-bottom:1px solid var(--color-border);">
+              <span>${nome}</span>
+              <button class="btn-danger" style="padding:4px 10px;font-size:12px"
+                onclick="removerMembroEquipe(${equipeId}, ${m.bombeiro_id}, '${equipeNome}')">
+                Remover
+              </button>
+            </div>
+          `;
+        }).join('')
+      : '<div class="empty-state">Nenhum membro alocado.</div>';
+
+    const selectOpcoes = disponiveis.length > 0
+      ? disponiveis.map((b) => `<option value="${b.id}">${b.nome} — ${b.patente}</option>`).join('')
+      : '<option disabled>Todos os bombeiros já estão alocados</option>';
+
+    document.getElementById('modal-body').innerHTML = `
+      <div class="form-group">
+        <label>Membros atuais</label>
+        <div style="max-height:200px;overflow-y:auto;">${listaMembros}</div>
+      </div>
+      <div class="form-group" style="margin-top:16px">
+        <label>Adicionar bombeiro</label>
+        <select id="select-bombeiro-equipe">${selectOpcoes}</select>
+      </div>
+      <div class="form-group">
+        <label>Função (opcional)</label>
+        <input type="text" id="funcao-membro" placeholder="Ex: Comandante de equipe" />
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+        <button class="btn-primary"   onclick="adicionarMembroEquipe(${equipeId}, '${equipeNome}')">
+          Adicionar
+        </button>
+      </div>
+    `;
+
+  } catch (erro) {
+    document.getElementById('modal-body').innerHTML =
+      '<div class="empty-state">Erro ao carregar membros.</div>';
+  }
+}
+
+async function adicionarMembroEquipe(equipeId, equipeNome) {
+  const bombeiroId = parseInt(document.getElementById('select-bombeiro-equipe').value);
+  const funcao     = document.getElementById('funcao-membro').value || null;
+
+  if (!bombeiroId) {
+    showToast('Selecione um bombeiro.', 'error');
+    return;
+  }
+
+  try {
+    await request('POST', `/equipes/${equipeId}/bombeiros`, {
+      bombeiro_id: bombeiroId,
+      funcao,
+    });
+    showToast('Bombeiro adicionado!', 'success');
+    await abrirModalMembros(equipeId, equipeNome);
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
+async function removerMembroEquipe(equipeId, bombeiroId, equipeNome) {
+  if (!confirm('Remover este bombeiro da equipe?')) return;
+  try {
+    await request('DELETE', `/equipes/${equipeId}/bombeiros/${bombeiroId}`);
+    showToast('Membro removido.', 'info');
+    await abrirModalMembros(equipeId, equipeNome);
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
+// =============================================
+// MODAIS DO COMANDANTE — Treinamentos
+// =============================================
+
+function abrirModalNovoTreinamento() {
+  openModal('Novo treinamento', `
+    <div class="form-group">
+      <label>Título</label>
+      <input type="text" id="tr-titulo" placeholder="Ex: Combate a Incêndio em Edificações" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="tr-tipo">
+          <option value="teorico">Teórico</option>
+          <option value="pratico">Prático</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="tr-status">
+          <option value="agendado">Agendado</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="concluido">Concluído</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Instrutor</label>
+        <input type="text" id="tr-instrutor" placeholder="Ex: Cel. José Augusto" />
+      </div>
+      <div class="form-group">
+        <label>Carga horária (h)</label>
+        <input type="number" id="tr-carga" min="1" placeholder="Ex: 40" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Data de início</label>
+        <input type="date" id="tr-inicio" />
+      </div>
+      <div class="form-group">
+        <label>Data de fim</label>
+        <input type="date" id="tr-fim" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="tr-descricao" rows="3" placeholder="Descreva o treinamento..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="criarTreinamento()">Criar</button>
+    </div>
+  `);
+}
+
+function abrirModalEditarTreinamento(t) {
+  openModal(`Treinamento — ${t.titulo}`, `
+    <div class="form-group">
+      <label>Título</label>
+      <input type="text" id="tr-titulo" value="${t.titulo}" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="tr-tipo">
+          <option value="teorico" ${t.tipo === 'teorico' ? 'selected':''}>Teórico</option>
+          <option value="pratico" ${t.tipo === 'pratico' ? 'selected':''}>Prático</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="tr-status">
+          <option value="agendado"     ${t.status === 'agendado'     ? 'selected':''}>Agendado</option>
+          <option value="em_andamento" ${t.status === 'em_andamento' ? 'selected':''}>Em andamento</option>
+          <option value="concluido"    ${t.status === 'concluido'    ? 'selected':''}>Concluído</option>
+          <option value="cancelado"    ${t.status === 'cancelado'    ? 'selected':''}>Cancelado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Instrutor</label>
+        <input type="text" id="tr-instrutor" value="${t.instrutor ?? ''}" />
+      </div>
+      <div class="form-group">
+        <label>Carga horária (h)</label>
+        <input type="number" id="tr-carga" min="1" value="${t.carga_horaria ?? ''}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Data de início</label>
+        <input type="date" id="tr-inicio" value="${t.data_inicio ?? ''}" />
+      </div>
+      <div class="form-group">
+        <label>Data de fim</label>
+        <input type="date" id="tr-fim" value="${t.data_fim ?? ''}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="tr-descricao" rows="3">${t.descricao ?? ''}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-danger"    onclick="deletarTreinamento(${t.id})">Excluir</button>
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="salvarTreinamento(${t.id})">Salvar</button>
+    </div>
+  `);
+}
+
+async function criarTreinamento() {
+  const dados = {
+    titulo:        document.getElementById('tr-titulo').value,
+    tipo:          document.getElementById('tr-tipo').value,
+    status:        document.getElementById('tr-status').value,
+    instrutor:     document.getElementById('tr-instrutor').value || null,
+    carga_horaria: parseInt(document.getElementById('tr-carga').value) || null,
+    data_inicio:   document.getElementById('tr-inicio').value || null,
+    data_fim:      document.getElementById('tr-fim').value || null,
+    descricao:     document.getElementById('tr-descricao').value || null,
+  };
+  if (!dados.titulo) {
+    showToast('Informe o título do treinamento.', 'error');
+    return;
+  }
+  try {
+    await Treinamentos.criar(dados);
+    closeModal();
+    showToast('Treinamento criado!', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
+async function salvarTreinamento(id) {
+  const dados = {
+    titulo:        document.getElementById('tr-titulo').value,
+    tipo:          document.getElementById('tr-tipo').value,
+    status:        document.getElementById('tr-status').value,
+    instrutor:     document.getElementById('tr-instrutor').value || null,
+    carga_horaria: parseInt(document.getElementById('tr-carga').value) || null,
+    data_inicio:   document.getElementById('tr-inicio').value || null,
+    data_fim:      document.getElementById('tr-fim').value || null,
+    descricao:     document.getElementById('tr-descricao').value || null,
+  };
+  try {
+    await Treinamentos.atualizar(id, dados);
+    closeModal();
+    showToast('Treinamento atualizado!', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
+}
+
+async function deletarTreinamento(id) {
+  if (!confirm('Excluir este treinamento?')) return;
+  try {
+    await Treinamentos.deletar(id);
+    closeModal();
+    showToast('Treinamento excluído.', 'info');
     await carregarRecursosComandante();
   } catch (erro) {
     showToast(`Erro: ${erro.message}`, 'error');
@@ -436,8 +767,6 @@ async function carregarViewTecnico() {
 
   container.innerHTML = `
     <div class="tecnico-layout">
-
-      <!-- Kanban de manutenções -->
       <div class="kanban-panel kanban-manutencao">
         <div class="panel-header">
           <span class="panel-title">Kanban de manutenções</span>
@@ -467,13 +796,10 @@ async function carregarViewTecnico() {
           </div>
         </div>
       </div>
-
-      <!-- Tabelas de viaturas e equipamentos -->
       <div style="display: flex; flex-direction: column; gap: 20px;">
         <div class="resource-card" id="card-viaturas-tecnico"></div>
         <div class="resource-card" id="card-equipamentos-tecnico"></div>
       </div>
-
     </div>
   `;
 
@@ -488,13 +814,8 @@ async function carregarTabelasTecnico() {
       Equipamentos.listar(),
     ]);
 
-    // Card de viaturas
     const cardV = document.getElementById('card-viaturas-tecnico');
-    cardV.innerHTML = `
-      <div class="resource-card-header">
-        <span class="resource-card-title">🚒 Viaturas</span>
-      </div>
-    `;
+    cardV.innerHTML = `<div class="resource-card-header"><span class="resource-card-title">🚒 Viaturas</span></div>`;
     cardV.appendChild(criarTabela(
       [
         { label: 'Placa',  key: 'placa' },
@@ -504,13 +825,8 @@ async function carregarTabelasTecnico() {
       viaturas
     ));
 
-    // Card de equipamentos
     const cardE = document.getElementById('card-equipamentos-tecnico');
-    cardE.innerHTML = `
-      <div class="resource-card-header">
-        <span class="resource-card-title">🧰 Equipamentos</span>
-      </div>
-    `;
+    cardE.innerHTML = `<div class="resource-card-header"><span class="resource-card-title">🧰 Equipamentos</span></div>`;
     cardE.appendChild(criarTabela(
       [
         { label: 'Nome',   key: 'nome' },
@@ -525,7 +841,6 @@ async function carregarTabelasTecnico() {
   }
 }
 
-// Modal de nova manutenção
 function abrirModalNovaManutencao() {
   openModal('Nova manutenção', `
     <div class="form-group">
@@ -595,8 +910,6 @@ async function carregarViewCidadao() {
 
   container.innerHTML = `
     <div class="cidadao-layout">
-
-      <!-- Formulário de denúncia -->
       <div class="cidadao-form-card">
         <h2>📢 Registrar denúncia</h2>
         <p>Informe uma situação de risco para análise dos bombeiros.</p>
@@ -629,8 +942,6 @@ async function carregarViewCidadao() {
           Enviar denúncia
         </button>
       </div>
-
-      <!-- Listagem de ocorrências públicas -->
       <div class="cidadao-form-card">
         <h2>🗂 Ocorrências recentes</h2>
         <p>Acompanhe o status das ocorrências em Brasília.</p>
@@ -638,7 +949,6 @@ async function carregarViewCidadao() {
           <div class="empty-state">Carregando...</div>
         </div>
       </div>
-
     </div>
   `;
 
@@ -651,14 +961,10 @@ async function carregarOcorrenciasCidadao() {
 
   try {
     const ocorrencias = await Ocorrencias.listar();
-
     const tabela = criarTabela(
       [
-        { label: 'Tipo',   key: 'tipo' },
-        {
-          label: 'Local',
-          render: (oc) => oc.endereco?.bairro ?? '—',
-        },
+        { label: 'Tipo',  key: 'tipo' },
+        { label: 'Local', render: (oc) => oc.endereco?.bairro ?? '—' },
         {
           label: 'Status',
           render: (oc) => {
@@ -687,10 +993,8 @@ async function carregarOcorrenciasCidadao() {
       ],
       ocorrencias
     );
-
     container.innerHTML = '';
     container.appendChild(tabela);
-
   } catch (erro) {
     container.innerHTML = '<div class="empty-state">Erro ao carregar ocorrências.</div>';
   }
@@ -698,27 +1002,22 @@ async function carregarOcorrenciasCidadao() {
 
 async function enviarDenuncia() {
   const dados = {
-    solicitante:       document.getElementById('den-nome').value,
-    telefone:          document.getElementById('den-telefone').value,
-    tipo:              document.getElementById('den-tipo').value,
+    solicitante:        document.getElementById('den-nome').value,
+    telefone:           document.getElementById('den-telefone').value,
+    tipo:               document.getElementById('den-tipo').value,
     endereco_informado: document.getElementById('den-endereco').value,
-    descricao:         document.getElementById('den-descricao').value,
+    descricao:          document.getElementById('den-descricao').value,
   };
-
   if (!dados.solicitante || !dados.descricao || !dados.endereco_informado) {
     showToast('Preencha nome, endereço e descrição.', 'error');
     return;
   }
-
   try {
     await Denuncias.criar(dados);
     showToast('Denúncia enviada com sucesso!', 'success');
-
-    // Limpa o formulário
     ['den-nome','den-telefone','den-endereco','den-descricao'].forEach((id) => {
       document.getElementById(id).value = '';
     });
-
   } catch (erro) {
     showToast(`Erro: ${erro.message}`, 'error');
   }
@@ -729,16 +1028,10 @@ async function enviarDenuncia() {
 // =============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Botão nova ocorrência
   document.getElementById('btn-nova-ocorrencia')
     .addEventListener('click', abrirModalNovaOcorrencia);
 
-  // Inicializa seletor de perfil
   inicializarSeletorPerfil();
-
-  // Inicializa mapa
   inicializarMapa();
-
-  // Carrega view inicial (Comandante)
   carregarViewComandante();
 });

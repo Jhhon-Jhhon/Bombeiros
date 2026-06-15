@@ -160,3 +160,15 @@ function badgePatente(item) {
   const label  = item.patente?.replace('_', ' ') ?? '—';
   return `<span class="badge ${classe}" style="text-transform:capitalize">${label}</span>`;
 }
+
+// Badge de status de treinamento
+function badgeStatusTreinamento(item) {
+  const mapa = {
+    agendado:     { classe: 'badge-info',    label: 'Agendado' },
+    em_andamento: { classe: 'badge-warning', label: 'Em andamento' },
+    concluido:    { classe: 'badge-success', label: 'Concluído' },
+    cancelado:    { classe: 'badge-muted',   label: 'Cancelado' },
+  };
+  const { classe, label } = mapa[item.status] ?? { classe: 'badge-muted', label: item.status };
+  return `<span class="badge ${classe}">${label}</span>`;
+}
