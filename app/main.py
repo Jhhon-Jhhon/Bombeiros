@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging
@@ -16,6 +17,7 @@ from app.routers import (
     viatura,
 )
 
+
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
 
@@ -23,6 +25,14 @@ app = FastAPI(
     title="API Bombeiros",
     description="Sistema de gestão de chamados — Sede de Bombeiros",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:5500", "http://localhost:5500"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(bombeiro.router)
