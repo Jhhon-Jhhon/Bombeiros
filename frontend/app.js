@@ -2,26 +2,19 @@
 // APP.JS — inicialização e controle de perfis
 // =============================================
 
-// =============================================
-// TROCA DE PERFIL
-// =============================================
-
 function inicializarSeletorPerfil() {
   const botoes = document.querySelectorAll('.profile-btn');
   const views  = document.querySelectorAll('.view');
-
   botoes.forEach((btn) => {
     btn.addEventListener('click', () => {
       const perfil = btn.dataset.profile;
-
       botoes.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-
       views.forEach((v) => v.classList.remove('active'));
       document.getElementById(`view-${perfil}`).classList.add('active');
-
       if (perfil === 'comandante') carregarViewComandante();
       if (perfil === 'tecnico')    carregarViewTecnico();
+      if (perfil === 'bombeiro')   carregarViewBombeiro();
       if (perfil === 'cidadao')    carregarViewCidadao();
     });
   });
@@ -34,7 +27,6 @@ function inicializarSeletorPerfil() {
 async function carregarViewComandante() {
   await carregarKanbanOcorrencias();
   await carregarRecursosComandante();
-
   if (mapaOcorrencias) {
     mapaOcorrencias.eachLayer((layer) => {
       if (layer instanceof L.Marker) mapaOcorrencias.removeLayer(layer);
@@ -47,7 +39,6 @@ async function carregarRecursosComandante() {
   const grid = document.getElementById('resources-grid');
   if (!grid) return;
   grid.innerHTML = '';
-
   try {
     const [bombeiros, viaturas, equipamentos, equipes] = await Promise.all([
       Bombeiros.listar(),
@@ -56,7 +47,6 @@ async function carregarRecursosComandante() {
       Equipes.listar(),
     ]);
 
-    // Card de Bombeiros
     grid.appendChild(criarResourceCard('👨‍🚒 Bombeiros', bombeiros,
       [
         { label: 'Nome',    key: 'nome' },
@@ -69,27 +59,31 @@ async function carregarRecursosComandante() {
       }
     ));
 
-    // Card de Viaturas
+    // FIX G/H: Comandante só cria viatura e solicita manutenção
+    // Não pode editar modelo/tipo/status — apenas ver e solicitar manutenção
     grid.appendChild(criarResourceCard('🚒 Viaturas', viaturas,
       [
         { label: 'Placa',  key: 'placa' },
         { label: 'Modelo', key: 'modelo' },
         { label: 'Status', render: badgeStatusViatura },
       ],
-      { onEditar: (v) => abrirModalEditarViatura(v) }
+      {
+        onEditar: (v) => abrirModalComandanteViatura(v),
+        btnExtra: { label: '+ Nova', onClick: abrirModalNovaViatura },
+      }
     ));
 
-    // Card de Equipamentos
+    // FIX F: Equipamento — Comandante só visualiza, não edita tipo
     grid.appendChild(criarResourceCard('🧰 Equipamentos', equipamentos,
       [
+        { label: 'ID',     key: 'id' },
         { label: 'Nome',   key: 'nome' },
         { label: 'Tipo',   key: 'tipo' },
         { label: 'Status', render: badgeStatusEquipamento },
       ],
-      { onEditar: (e) => abrirModalEditarEquipamento(e) }
+      {}
     ));
 
-    // Card de Equipes
     grid.appendChild(criarResourceCard('👥 Equipes', equipes,
       [
         { label: 'Nome', key: 'nome' },
@@ -101,7 +95,6 @@ async function carregarRecursosComandante() {
       }
     ));
 
-    // Card de Treinamentos
     const treinamentos = await Treinamentos.listar();
     grid.appendChild(criarResourceCard('🎓 Treinamentos', treinamentos,
       [
@@ -116,21 +109,58 @@ async function carregarRecursosComandante() {
       }
     ));
 
+    const [denuncias, solicitacoes] = await Promise.all([
+      Denuncias.listar(),
+      Solicitacoes.listar(),
+    ]);
+
+    grid.appendChild(criarResourceCard('📢 Denúncias recebidas', denuncias,
+      [
+        { label: 'Solicitante', key: 'solicitante' },
+        { label: 'Tipo',        key: 'tipo' },
+        {
+          label: 'Status',
+          render: (d) => {
+            const mapa = {
+              pendente:   { classe: 'badge-warning', label: 'Pendente' },
+              em_analise: { classe: 'badge-info',    label: 'Em análise' },
+              resolvida:  { classe: 'badge-success', label: 'Resolvida' },
+              arquivada:  { classe: 'badge-muted',   label: 'Arquivada' },
+            };
+            const { classe, label } = mapa[d.status] ?? { classe: 'badge-muted', label: d.status };
+            return `<span class="badge ${classe}">${label}</span>`;
+          },
+        },
+      ],
+      { onEditar: (d) => abrirModalVerificarDenuncia(d) }
+    ));
+
+    grid.appendChild(criarResourceCard('📋 Solicitações', solicitacoes,
+      [
+        { label: 'Tipo',      key: 'tipo' },
+        { label: 'Prioridade', key: 'prioridade' },
+        {
+          label: 'Status',
+          render: (s) => s.arquivada
+            ? `<span class="badge badge-muted">Arquivada</span>`
+            : `<span class="badge badge-info">Ativa</span>`,
+        },
+      ],
+      { onEditar: (s) => abrirModalAvaliarSolicitacao(s) }
+    ));
+
   } catch (erro) {
     console.error('Erro carregarRecursosComandante:', erro);
     showToast('Erro ao carregar recursos.', 'error');
   }
 }
 
-// Monta um resource card com tabela dentro
 function criarResourceCard(titulo, dados, colunas, opcoes = {}) {
   const card = document.createElement('div');
   card.className = 'resource-card';
-
   const header = document.createElement('div');
   header.className = 'resource-card-header';
   header.innerHTML = `<span class="resource-card-title">${titulo}</span>`;
-
   if (opcoes.btnExtra) {
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
@@ -138,10 +168,8 @@ function criarResourceCard(titulo, dados, colunas, opcoes = {}) {
     btn.addEventListener('click', opcoes.btnExtra.onClick);
     header.appendChild(btn);
   }
-
   card.appendChild(header);
   card.appendChild(criarTabela(colunas, dados, opcoes));
-
   return card;
 }
 
@@ -210,35 +238,35 @@ function abrirModalEditarBombeiro(b) {
       </div>
       <div class="form-group">
         <label>Matrícula</label>
-        <input type="text" id="b-matricula" value="${b.matricula}" disabled />
+        <input type="text" value="${b.matricula}" disabled />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Patente</label>
         <select id="b-patente">
-          <option value="soldado"         ${b.patente === 'soldado'         ? 'selected':''}>Soldado</option>
-          <option value="cabo"            ${b.patente === 'cabo'            ? 'selected':''}>Cabo</option>
-          <option value="sargento"        ${b.patente === 'sargento'        ? 'selected':''}>Sargento</option>
-          <option value="tenente"         ${b.patente === 'tenente'         ? 'selected':''}>Tenente</option>
-          <option value="capitao"         ${b.patente === 'capitao'         ? 'selected':''}>Capitão</option>
-          <option value="major"           ${b.patente === 'major'           ? 'selected':''}>Major</option>
-          <option value="tenente_coronel" ${b.patente === 'tenente_coronel' ? 'selected':''}>Tenente Coronel</option>
-          <option value="coronel"         ${b.patente === 'coronel'         ? 'selected':''}>Coronel</option>
+          <option value="soldado"         ${b.patente==='soldado'         ?'selected':''}>Soldado</option>
+          <option value="cabo"            ${b.patente==='cabo'            ?'selected':''}>Cabo</option>
+          <option value="sargento"        ${b.patente==='sargento'        ?'selected':''}>Sargento</option>
+          <option value="tenente"         ${b.patente==='tenente'         ?'selected':''}>Tenente</option>
+          <option value="capitao"         ${b.patente==='capitao'         ?'selected':''}>Capitão</option>
+          <option value="major"           ${b.patente==='major'           ?'selected':''}>Major</option>
+          <option value="tenente_coronel" ${b.patente==='tenente_coronel' ?'selected':''}>Tenente Coronel</option>
+          <option value="coronel"         ${b.patente==='coronel'         ?'selected':''}>Coronel</option>
         </select>
       </div>
       <div class="form-group">
         <label>Status</label>
         <select id="b-status">
-          <option value="ativo"    ${b.status === 'ativo'    ? 'selected':''}>Ativo</option>
-          <option value="de_folga" ${b.status === 'de_folga' ? 'selected':''}>De folga</option>
-          <option value="inativo"  ${b.status === 'inativo'  ? 'selected':''}>Inativo</option>
+          <option value="ativo"    ${b.status==='ativo'    ?'selected':''}>Ativo</option>
+          <option value="de_folga" ${b.status==='de_folga' ?'selected':''}>De folga</option>
+          <option value="inativo"  ${b.status==='inativo'  ?'selected':''}>Inativo</option>
         </select>
       </div>
     </div>
     <div class="form-group">
       <label>Especialidade</label>
-      <input type="text" id="b-especialidade" value="${b.especialidade ?? ''}" />
+      <input type="text" id="b-especialidade" value="${b.especialidade??''}" />
     </div>
     <div class="form-actions">
       <button class="btn-danger"    onclick="deletarBombeiro(${b.id})">Excluir</button>
@@ -263,9 +291,7 @@ async function criarBombeiro() {
     closeModal();
     showToast('Bombeiro cadastrado!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function salvarBombeiro(id) {
@@ -280,9 +306,7 @@ async function salvarBombeiro(id) {
     closeModal();
     showToast('Bombeiro atualizado!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function deletarBombeiro(id) {
@@ -292,114 +316,149 @@ async function deletarBombeiro(id) {
     closeModal();
     showToast('Bombeiro excluído.', 'info');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
 // MODAIS DO COMANDANTE — Viatura
+// FIX G/H: Comandante só cria viatura e solicita manutenção
+// Não edita modelo/tipo/status — apenas visualiza
 // =============================================
 
-function abrirModalEditarViatura(v) {
-  openModal(`Viatura — ${v.placa}`, `
-    <div class="form-group">
-      <label>Modelo</label>
-      <input type="text" id="v-modelo" value="${v.modelo}" />
+function abrirModalNovaViatura() {
+  openModal('Nova viatura', `
+    <div class="form-row">
+      <div class="form-group">
+        <label>Placa</label>
+        <input type="text" id="v-placa" placeholder="Ex: DF-005-AB" />
+      </div>
+      <div class="form-group">
+        <label>Modelo</label>
+        <input type="text" id="v-modelo" placeholder="Ex: Scania P360" />
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Tipo</label>
         <select id="v-tipo">
-          <option value="auto_bomba"   ${v.tipo === 'auto_bomba'   ? 'selected':''}>Auto Bomba</option>
-          <option value="auto_escada"  ${v.tipo === 'auto_escada'  ? 'selected':''}>Auto Escada</option>
-          <option value="ambulancia"   ${v.tipo === 'ambulancia'   ? 'selected':''}>Ambulância</option>
-          <option value="veiculo_leve" ${v.tipo === 'veiculo_leve' ? 'selected':''}>Veículo Leve</option>
+          <option value="auto_bomba">Auto Bomba</option>
+          <option value="auto_escada">Auto Escada</option>
+          <option value="ambulancia">Ambulância</option>
+          <option value="veiculo_leve">Veículo Leve</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Status</label>
-        <select id="v-status">
-          <option value="disponivel"    ${v.status === 'disponivel'    ? 'selected':''}>Disponível</option>
-          <option value="em_manutencao" ${v.status === 'em_manutencao' ? 'selected':''}>Em manutenção</option>
-          <option value="inativa"       ${v.status === 'inativa'       ? 'selected':''}>Inativa</option>
-        </select>
+        <label>Ano de fabricação</label>
+        <input type="number" id="v-ano" min="2000" max="2030" placeholder="Ex: 2023" />
       </div>
     </div>
     <div class="form-actions">
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary"   onclick="salvarViatura(${v.id})">Salvar</button>
+      <button class="btn-primary"   onclick="criarViatura()">Criar</button>
     </div>
   `);
 }
 
-async function salvarViatura(id) {
+async function criarViatura() {
   const dados = {
-    modelo: document.getElementById('v-modelo').value,
-    tipo:   document.getElementById('v-tipo').value,
-    status: document.getElementById('v-status').value,
+    placa:          document.getElementById('v-placa').value,
+    modelo:         document.getElementById('v-modelo').value,
+    tipo:           document.getElementById('v-tipo').value,
+    ano_fabricacao: parseInt(document.getElementById('v-ano').value) || null,
+    status:         'disponivel',
   };
+  if (!dados.placa || !dados.modelo) { showToast('Informe placa e modelo.', 'error'); return; }
   try {
-    await Viaturas.atualizar(id, dados);
+    await Viaturas.criar(dados);
     closeModal();
-    showToast('Viatura atualizada!', 'success');
+    showToast('Viatura criada!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-// =============================================
-// MODAIS DO COMANDANTE — Equipamento
-// =============================================
+// FIX G/H: Modal do Comandante para viatura é SOMENTE LEITURA
+// Apenas mostra dados e permite solicitar manutenção
+function abrirModalComandanteViatura(v) {
+  const statusLabel = {
+    disponivel:     'Disponível',
+    em_manutencao:  'Em manutenção',
+    em_atendimento: 'Em atendimento',
+    inativa:        'Inativa',
+  }[v.status] ?? v.status;
 
-function abrirModalEditarEquipamento(e) {
-  openModal(`Equipamento — ${e.nome}`, `
-    <div class="form-group">
-      <label>Nome</label>
-      <input type="text" id="eq-nome" value="${e.nome}" />
+  const podeSolicitarManutencao = v.status === 'disponivel';
+
+  openModal(`Viatura — ${v.placa}`, `
+    <div class="form-row">
+      <div class="form-group">
+        <label>Placa</label>
+        <input type="text" value="${v.placa}" disabled />
+      </div>
+      <div class="form-group">
+        <label>Modelo</label>
+        <input type="text" value="${v.modelo}" disabled />
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Tipo</label>
-        <select id="eq-tipo">
-          <option value="combate" ${e.tipo === 'combate' ? 'selected':''}>Combate</option>
-          <option value="resgate" ${e.tipo === 'resgate' ? 'selected':''}>Resgate</option>
-          <option value="medico"  ${e.tipo === 'medico'  ? 'selected':''}>Médico</option>
-          <option value="outros"  ${e.tipo === 'outros'  ? 'selected':''}>Outros</option>
-        </select>
+        <input type="text" value="${v.tipo}" disabled />
       </div>
       <div class="form-group">
-        <label>Status</label>
-        <select id="eq-status">
-          <option value="disponivel"    ${e.status === 'disponivel'    ? 'selected':''}>Disponível</option>
-          <option value="em_uso"        ${e.status === 'em_uso'        ? 'selected':''}>Em uso</option>
-          <option value="em_manutencao" ${e.status === 'em_manutencao' ? 'selected':''}>Em manutenção</option>
-          <option value="inativo"       ${e.status === 'inativo'       ? 'selected':''}>Inativo</option>
-        </select>
+        <label>Status (definido pelo Técnico)</label>
+        <input type="text" value="${statusLabel}" disabled
+          style="color:${v.status==='disponivel'?'var(--color-encerrada)':v.status==='em_manutencao'?'var(--color-alta)':'var(--color-text-muted)'}" />
       </div>
     </div>
+    ${!podeSolicitarManutencao ? `
+      <p class="text-muted" style="font-size:12px;margin-top:8px;">
+        ⚠ Viatura indisponível para manutenção no momento (status: ${statusLabel}).
+      </p>` : ''}
     <div class="form-actions">
-      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary"   onclick="salvarEquipamento(${e.id})">Salvar</button>
+      <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+      ${podeSolicitarManutencao ? `
+        <button class="btn-primary" style="background:var(--color-alta);"
+          onclick="solicitarManutencaoViatura(${v.id}, '${v.placa}')">
+          🔧 Solicitar manutenção
+        </button>` : ''}
     </div>
   `);
 }
 
-async function salvarEquipamento(id) {
-  const dados = {
-    nome:   document.getElementById('eq-nome').value,
-    tipo:   document.getElementById('eq-tipo').value,
-    status: document.getElementById('eq-status').value,
-  };
+async function solicitarManutencaoViatura(viaturaId, placa) {
+  openModal(`Solicitar manutenção — ${placa}`, `
+    <div class="form-group">
+      <label>Tipo de manutenção</label>
+      <select id="sol-manut-tipo">
+        <option value="preventiva">Preventiva</option>
+        <option value="corretiva">Corretiva</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descrição do problema</label>
+      <textarea id="sol-manut-desc" rows="3" placeholder="Descreva o motivo da manutenção..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="confirmarSolicitacaoManutencao(${viaturaId})">Solicitar</button>
+    </div>
+  `);
+}
+
+async function confirmarSolicitacaoManutencao(viaturaId) {
+  const tipo      = document.getElementById('sol-manut-tipo').value;
+  const descricao = document.getElementById('sol-manut-desc').value;
+  if (!descricao) { showToast('Informe a descrição.', 'error'); return; }
   try {
-    await Equipamentos.atualizar(id, dados);
+    await Manutencoes.criar({
+      tipo, descricao, viatura_id: viaturaId,
+      data_inicio: new Date().toISOString().split('T')[0],
+    });
+    await Viaturas.atualizar(viaturaId, { status: 'em_manutencao' });
     closeModal();
-    showToast('Equipamento atualizado!', 'success');
+    showToast('Manutenção solicitada! Viatura marcada como em manutenção.', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
@@ -428,18 +487,13 @@ async function criarEquipe() {
     nome: document.getElementById('eq-nome-equipe').value,
     tipo: document.getElementById('eq-tipo-equipe').value,
   };
-  if (!dados.nome || !dados.tipo) {
-    showToast('Informe o nome e o tipo da equipe.', 'error');
-    return;
-  }
+  if (!dados.nome || !dados.tipo) { showToast('Informe nome e tipo.', 'error'); return; }
   try {
     await Equipes.criar(dados);
     closeModal();
     showToast('Equipe criada!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 function abrirModalEditarEquipe(eq) {
@@ -450,12 +504,12 @@ function abrirModalEditarEquipe(eq) {
     </div>
     <div class="form-group">
       <label>Tipo</label>
-      <input type="text" id="eq-tipo-equipe" value="${eq.tipo ?? ''}" />
+      <input type="text" id="eq-tipo-equipe" value="${eq.tipo??''}" />
     </div>
     <div class="form-actions">
       <button class="btn-danger"    onclick="deletarEquipe(${eq.id})">Excluir</button>
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-secondary" onclick="abrirModalMembros(${eq.id}, '${eq.nome}')">👥 Membros</button>
+      <button class="btn-secondary" onclick="abrirModalMembros(${eq.id},'${eq.nome}')">👥 Membros</button>
       <button class="btn-primary"   onclick="salvarEquipe(${eq.id})">Salvar</button>
     </div>
   `);
@@ -471,9 +525,7 @@ async function salvarEquipe(id) {
     closeModal();
     showToast('Equipe atualizada!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function deletarEquipe(id) {
@@ -483,9 +535,7 @@ async function deletarEquipe(id) {
     closeModal();
     showToast('Equipe excluída.', 'info');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
@@ -494,37 +544,28 @@ async function deletarEquipe(id) {
 
 async function abrirModalMembros(equipeId, equipeNome) {
   openModal(`Membros — ${equipeNome}`, '<div class="empty-state">Carregando...</div>');
-
   try {
     const [membros, bombeiros] = await Promise.all([
       request('GET', `/equipes/${equipeId}/bombeiros`),
       Bombeiros.listar(),
     ]);
-
     const idsAlocados = membros.map((m) => m.bombeiro_id);
     const disponiveis = bombeiros.filter((b) => !idsAlocados.includes(b.id));
-
     const listaMembros = membros.length > 0
       ? membros.map((m) => {
           const b = bombeiros.find((x) => x.id === m.bombeiro_id);
           const nome = b ? b.nome : `Bombeiro #${m.bombeiro_id}`;
-          return `
-            <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding:8px 0;border-bottom:1px solid var(--color-border);">
-              <span>${nome}</span>
-              <button class="btn-danger" style="padding:4px 10px;font-size:12px"
-                onclick="removerMembroEquipe(${equipeId}, ${m.bombeiro_id}, '${equipeNome}')">
-                Remover
-              </button>
-            </div>
-          `;
+          return `<div style="display:flex;justify-content:space-between;align-items:center;
+                      padding:8px 0;border-bottom:1px solid var(--color-border);">
+            <span>${nome}</span>
+            <button class="btn-danger" style="padding:4px 10px;font-size:12px"
+              onclick="removerMembroEquipe(${equipeId},${m.bombeiro_id},'${equipeNome}')">Remover</button>
+          </div>`;
         }).join('')
       : '<div class="empty-state">Nenhum membro alocado.</div>';
-
     const selectOpcoes = disponiveis.length > 0
       ? disponiveis.map((b) => `<option value="${b.id}">${b.nome} — ${b.patente}</option>`).join('')
-      : '<option disabled>Todos os bombeiros já estão alocados</option>';
-
+      : '<option disabled>Todos já alocados</option>';
     document.getElementById('modal-body').innerHTML = `
       <div class="form-group">
         <label>Membros atuais</label>
@@ -540,37 +581,22 @@ async function abrirModalMembros(equipeId, equipeNome) {
       </div>
       <div class="form-actions">
         <button class="btn-secondary" onclick="closeModal()">Fechar</button>
-        <button class="btn-primary"   onclick="adicionarMembroEquipe(${equipeId}, '${equipeNome}')">
-          Adicionar
-        </button>
-      </div>
-    `;
-
+        <button class="btn-primary" onclick="adicionarMembroEquipe(${equipeId},'${equipeNome}')">Adicionar</button>
+      </div>`;
   } catch (erro) {
-    document.getElementById('modal-body').innerHTML =
-      '<div class="empty-state">Erro ao carregar membros.</div>';
+    document.getElementById('modal-body').innerHTML = '<div class="empty-state">Erro ao carregar membros.</div>';
   }
 }
 
 async function adicionarMembroEquipe(equipeId, equipeNome) {
   const bombeiroId = parseInt(document.getElementById('select-bombeiro-equipe').value);
-  const funcao     = document.getElementById('funcao-membro').value || null;
-
-  if (!bombeiroId) {
-    showToast('Selecione um bombeiro.', 'error');
-    return;
-  }
-
+  const funcao = document.getElementById('funcao-membro').value || null;
+  if (!bombeiroId) { showToast('Selecione um bombeiro.', 'error'); return; }
   try {
-    await request('POST', `/equipes/${equipeId}/bombeiros`, {
-      bombeiro_id: bombeiroId,
-      funcao,
-    });
+    await request('POST', `/equipes/${equipeId}/bombeiros`, { bombeiro_id: bombeiroId, funcao });
     showToast('Bombeiro adicionado!', 'success');
     await abrirModalMembros(equipeId, equipeNome);
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function removerMembroEquipe(equipeId, bombeiroId, equipeNome) {
@@ -579,9 +605,7 @@ async function removerMembroEquipe(equipeId, bombeiroId, equipeNome) {
     await request('DELETE', `/equipes/${equipeId}/bombeiros/${bombeiroId}`);
     showToast('Membro removido.', 'info');
     await abrirModalMembros(equipeId, equipeNome);
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
@@ -653,43 +677,43 @@ function abrirModalEditarTreinamento(t) {
       <div class="form-group">
         <label>Tipo</label>
         <select id="tr-tipo">
-          <option value="teorico" ${t.tipo === 'teorico' ? 'selected':''}>Teórico</option>
-          <option value="pratico" ${t.tipo === 'pratico' ? 'selected':''}>Prático</option>
+          <option value="teorico" ${t.tipo==='teorico'?'selected':''}>Teórico</option>
+          <option value="pratico" ${t.tipo==='pratico'?'selected':''}>Prático</option>
         </select>
       </div>
       <div class="form-group">
         <label>Status</label>
         <select id="tr-status">
-          <option value="agendado"     ${t.status === 'agendado'     ? 'selected':''}>Agendado</option>
-          <option value="em_andamento" ${t.status === 'em_andamento' ? 'selected':''}>Em andamento</option>
-          <option value="concluido"    ${t.status === 'concluido'    ? 'selected':''}>Concluído</option>
-          <option value="cancelado"    ${t.status === 'cancelado'    ? 'selected':''}>Cancelado</option>
+          <option value="agendado"     ${t.status==='agendado'    ?'selected':''}>Agendado</option>
+          <option value="em_andamento" ${t.status==='em_andamento'?'selected':''}>Em andamento</option>
+          <option value="concluido"    ${t.status==='concluido'   ?'selected':''}>Concluído</option>
+          <option value="cancelado"    ${t.status==='cancelado'   ?'selected':''}>Cancelado</option>
         </select>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Instrutor</label>
-        <input type="text" id="tr-instrutor" value="${t.instrutor ?? ''}" />
+        <input type="text" id="tr-instrutor" value="${t.instrutor??''}" />
       </div>
       <div class="form-group">
         <label>Carga horária (h)</label>
-        <input type="number" id="tr-carga" min="1" value="${t.carga_horaria ?? ''}" />
+        <input type="number" id="tr-carga" min="1" value="${t.carga_horaria??''}" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Data de início</label>
-        <input type="date" id="tr-inicio" value="${t.data_inicio ?? ''}" />
+        <input type="date" id="tr-inicio" value="${t.data_inicio??''}" />
       </div>
       <div class="form-group">
         <label>Data de fim</label>
-        <input type="date" id="tr-fim" value="${t.data_fim ?? ''}" />
+        <input type="date" id="tr-fim" value="${t.data_fim??''}" />
       </div>
     </div>
     <div class="form-group">
       <label>Descrição</label>
-      <textarea id="tr-descricao" rows="3">${t.descricao ?? ''}</textarea>
+      <textarea id="tr-descricao" rows="3">${t.descricao??''}</textarea>
     </div>
     <div class="form-actions">
       <button class="btn-danger"    onclick="deletarTreinamento(${t.id})">Excluir</button>
@@ -710,18 +734,13 @@ async function criarTreinamento() {
     data_fim:      document.getElementById('tr-fim').value || null,
     descricao:     document.getElementById('tr-descricao').value || null,
   };
-  if (!dados.titulo) {
-    showToast('Informe o título do treinamento.', 'error');
-    return;
-  }
+  if (!dados.titulo) { showToast('Informe o título.', 'error'); return; }
   try {
     await Treinamentos.criar(dados);
     closeModal();
     showToast('Treinamento criado!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function salvarTreinamento(id) {
@@ -740,9 +759,7 @@ async function salvarTreinamento(id) {
     closeModal();
     showToast('Treinamento atualizado!', 'success');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function deletarTreinamento(id) {
@@ -752,19 +769,177 @@ async function deletarTreinamento(id) {
     closeModal();
     showToast('Treinamento excluído.', 'info');
     await carregarRecursosComandante();
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// =============================================
+// MODAIS DO COMANDANTE — Denúncias e Solicitações
+// =============================================
+
+function abrirModalVerificarDenuncia(d) {
+  openModal(`Denúncia — ${d.solicitante}`, `
+    <div class="form-group">
+      <label>Solicitante</label>
+      <input type="text" value="${d.solicitante}" disabled />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Telefone</label>
+        <input type="text" value="${d.telefone??'—'}" disabled />
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <input type="text" value="${d.tipo}" disabled />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Endereço informado</label>
+      <input type="text" value="${d.endereco_informado??'—'}" disabled />
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea rows="3" disabled>${d.descricao}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="den-status">
+        <option value="pendente"   ${d.status==='pendente'   ?'selected':''}>Pendente</option>
+        <option value="em_analise" ${d.status==='em_analise' ?'selected':''}>Em análise</option>
+        <option value="resolvida"  ${d.status==='resolvida'  ?'selected':''}>Resolvida</option>
+        <option value="arquivada"  ${d.status==='arquivada'  ?'selected':''}>Arquivada</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="atualizarDenuncia(${d.id})">Atualizar</button>
+    </div>
+  `);
+}
+
+async function atualizarDenuncia(id) {
+  const dados = { status: document.getElementById('den-status').value };
+  try {
+    await Denuncias.atualizar(id, dados);
+    closeModal();
+    showToast('Denúncia atualizada!', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+function abrirModalAvaliarSolicitacao(s) {
+  openModal(`Solicitação #${s.id}`, `
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <input type="text" value="${s.tipo}" disabled />
+      </div>
+      <div class="form-group">
+        <label>Prioridade</label>
+        <input type="text" value="${s.prioridade??'—'}" disabled />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Observação</label>
+      <textarea id="sol-obs" rows="3" placeholder="Observação do comandante...">${s.observacao??''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Arquivar solicitação?</label>
+      <select id="sol-arquivada">
+        <option value="false" ${!s.arquivada?'selected':''}>Não — manter ativa</option>
+        <option value="true"  ${s.arquivada ?'selected':''}>Sim — arquivar</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="avaliarSolicitacao(${s.id})">Salvar</button>
+    </div>
+  `);
+}
+
+async function avaliarSolicitacao(id) {
+  const dados = {
+    arquivada:  document.getElementById('sol-arquivada').value === 'true',
+    observacao: document.getElementById('sol-obs').value || null,
+  };
+  try {
+    await Solicitacoes.atualizar(id, dados);
+    closeModal();
+    showToast('Solicitação atualizada!', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// =============================================
+// FIX I: Encerrar ocorrência no Kanban do Comandante
+// Ocorrências não são deletadas — são encerradas (status = encerrada)
+// =============================================
+
+// Esta função é chamada pelo kanban.js ao clicar num card
+function abrirModalOcorrencia(oc) {
+  const duracao = oc.data_encerramento
+    ? calcularDuracao(oc.data_abertura, oc.data_encerramento)
+    : null;
+
+  openModal(`Ocorrência #${oc.id}`, `
+    <div class="form-group">
+      <label>Tipo</label>
+      <select id="edit-tipo">
+        <option value="incendio"  ${oc.tipo==='incendio'  ?'selected':''}>Incêndio</option>
+        <option value="acidente"  ${oc.tipo==='acidente'  ?'selected':''}>Acidente</option>
+        <option value="resgate"   ${oc.tipo==='resgate'   ?'selected':''}>Resgate</option>
+        <option value="inundacao" ${oc.tipo==='inundacao' ?'selected':''}>Inundação</option>
+        <option value="outros"    ${oc.tipo==='outros'    ?'selected':''}>Outros</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="edit-descricao" rows="3">${oc.descricao}</textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Prioridade</label>
+        <select id="edit-prioridade">
+          <option value="baixa"   ${oc.prioridade==='baixa'   ?'selected':''}>Baixa</option>
+          <option value="media"   ${oc.prioridade==='media'   ?'selected':''}>Média</option>
+          <option value="alta"    ${oc.prioridade==='alta'    ?'selected':''}>Alta</option>
+          <option value="critica" ${oc.prioridade==='critica' ?'selected':''}>Crítica</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="edit-status">
+          <option value="aberta"       ${oc.status==='aberta'       ?'selected':''}>Aberta</option>
+          <option value="em_andamento" ${oc.status==='em_andamento' ?'selected':''}>Em andamento</option>
+          <option value="encerrada"    ${oc.status==='encerrada'    ?'selected':''}>Encerrada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Nº de vítimas</label>
+      <input type="number" id="edit-vitimas" min="0" value="${oc.num_vitimas??0}" />
+    </div>
+    ${duracao ? `
+      <div class="form-group">
+        <label>Duração do atendimento</label>
+        <input type="text" value="${duracao}" disabled />
+      </div>` : ''}
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="salvarEdicaoOcorrencia(${oc.id})">Salvar</button>
+    </div>
+  `);
 }
 
 // =============================================
 // VIEW: TÉCNICO
+// FIX D: Equipamentos com ID visível
+// FIX E: Placa/equipamento obrigatórios na manutenção
+// FIX F: Tipo do equipamento não editável
 // =============================================
 
 async function carregarViewTecnico() {
   const container = document.getElementById('tecnico-content');
   if (!container) return;
-
   container.innerHTML = `
     <div class="tecnico-layout">
       <div class="kanban-panel kanban-manutencao">
@@ -775,34 +950,30 @@ async function carregarViewTecnico() {
         <div class="kanban-board">
           <div class="kanban-col">
             <div class="kanban-col-header status-pendente">
-              Pendente
-              <span class="col-count" id="count-manut-pendente">0</span>
+              Pendente <span class="col-count" id="count-manut-pendente">0</span>
             </div>
             <div class="kanban-cards" id="col-manut-pendente"></div>
           </div>
           <div class="kanban-col">
             <div class="kanban-col-header status-em-andamento">
-              Em andamento
-              <span class="col-count" id="count-manut-em-andamento">0</span>
+              Em andamento <span class="col-count" id="count-manut-em-andamento">0</span>
             </div>
             <div class="kanban-cards" id="col-manut-em-andamento"></div>
           </div>
           <div class="kanban-col">
             <div class="kanban-col-header status-concluida">
-              Concluída
-              <span class="col-count" id="count-manut-concluida">0</span>
+              Concluída <span class="col-count" id="count-manut-concluida">0</span>
             </div>
             <div class="kanban-cards" id="col-manut-concluida"></div>
           </div>
         </div>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display:flex;flex-direction:column;gap:20px;">
         <div class="resource-card" id="card-viaturas-tecnico"></div>
         <div class="resource-card" id="card-equipamentos-tecnico"></div>
       </div>
     </div>
   `;
-
   await carregarKanbanManutencoes();
   await carregarTabelasTecnico();
 }
@@ -815,32 +986,179 @@ async function carregarTabelasTecnico() {
     ]);
 
     const cardV = document.getElementById('card-viaturas-tecnico');
-    cardV.innerHTML = `<div class="resource-card-header"><span class="resource-card-title">🚒 Viaturas</span></div>`;
+    cardV.innerHTML = `<div class="resource-card-header">
+      <span class="resource-card-title">🚒 Viaturas</span>
+    </div>`;
     cardV.appendChild(criarTabela(
       [
         { label: 'Placa',  key: 'placa' },
         { label: 'Modelo', key: 'modelo' },
         { label: 'Status', render: badgeStatusViatura },
       ],
-      viaturas
+      viaturas,
+      { onEditar: (v) => abrirModalTecnicoViatura(v) }
     ));
 
+    // FIX D: coluna ID visível
     const cardE = document.getElementById('card-equipamentos-tecnico');
-    cardE.innerHTML = `<div class="resource-card-header"><span class="resource-card-title">🧰 Equipamentos</span></div>`;
+    cardE.innerHTML = `<div class="resource-card-header">
+      <span class="resource-card-title">🧰 Equipamentos</span>
+      <button class="btn-primary" onclick="abrirModalNovoEquipamento()">+ Novo</button>
+    </div>`;
     cardE.appendChild(criarTabela(
       [
+        { label: 'ID',     key: 'id' },
         { label: 'Nome',   key: 'nome' },
         { label: 'Tipo',   key: 'tipo' },
         { label: 'Status', render: badgeStatusEquipamento },
       ],
-      equipamentos
+      equipamentos,
+      { onEditar: (e) => abrirModalTecnicoEquipamento(e) }
     ));
-
   } catch (erro) {
     showToast('Erro ao carregar dados do técnico.', 'error');
   }
 }
 
+function abrirModalTecnicoViatura(v) {
+  openModal(`Viatura — ${v.placa}`, `
+    <div class="form-group">
+      <label>Modelo</label>
+      <input type="text" value="${v.modelo}" disabled />
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="tecnico-v-status">
+        <option value="disponivel"    ${v.status==='disponivel'    ?'selected':''}>Disponível</option>
+        <option value="em_manutencao" ${v.status==='em_manutencao' ?'selected':''}>Em manutenção</option>
+        <option value="inativa"       ${v.status==='inativa'       ?'selected':''}>Inativa</option>
+      </select>
+    </div>
+    <p class="text-muted" style="font-size:12px;margin-top:4px;">
+      O Técnico é responsável por liberar a viatura como disponível após concluir a manutenção.
+    </p>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="tecnicoAtualizarViatura(${v.id})">Atualizar status</button>
+    </div>
+  `);
+}
+
+async function tecnicoAtualizarViatura(id) {
+  const dados = { status: document.getElementById('tecnico-v-status').value };
+  try {
+    await Viaturas.atualizar(id, dados);
+    closeModal();
+    showToast('Status da viatura atualizado!', 'success');
+    await carregarTabelasTecnico();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+function abrirModalNovoEquipamento() {
+  openModal('Novo equipamento', `
+    <div class="form-group">
+      <label>Nome</label>
+      <input type="text" id="teq-nome" placeholder="Ex: Mangueira 40mm" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="teq-tipo">
+          <option value="combate">Combate</option>
+          <option value="resgate">Resgate</option>
+          <option value="medico">Médico</option>
+          <option value="outros">Outros</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Número de série</label>
+        <input type="text" id="teq-serie" placeholder="Ex: MNG-001" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="criarEquipamentoTecnico()">Criar</button>
+    </div>
+  `);
+}
+
+async function criarEquipamentoTecnico() {
+  const dados = {
+    nome:         document.getElementById('teq-nome').value,
+    tipo:         document.getElementById('teq-tipo').value,
+    numero_serie: document.getElementById('teq-serie').value || null,
+    status:       'disponivel',
+  };
+  if (!dados.nome) { showToast('Informe o nome.', 'error'); return; }
+  try {
+    await Equipamentos.criar(dados);
+    closeModal();
+    showToast('Equipamento criado!', 'success');
+    await carregarTabelasTecnico();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// FIX F: Tipo não editável — apenas status e associação a viatura
+async function abrirModalTecnicoEquipamento(e) {
+  const viaturas = await Viaturas.listar();
+  const opcoesViaturas = viaturas.map((v) =>
+    `<option value="${v.id}">${v.placa} — ${v.modelo}</option>`
+  ).join('');
+
+  openModal(`Equipamento #${e.id} — ${e.nome}`, `
+    <div class="form-group">
+      <label>Nome</label>
+      <input type="text" value="${e.nome}" disabled />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <input type="text" value="${e.tipo}" disabled />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="teq-edit-status">
+          <option value="disponivel"    ${e.status==='disponivel'    ?'selected':''}>Disponível</option>
+          <option value="em_uso"        ${e.status==='em_uso'        ?'selected':''}>Em uso</option>
+          <option value="em_manutencao" ${e.status==='em_manutencao' ?'selected':''}>Em manutenção</option>
+          <option value="inativo"       ${e.status==='inativo'       ?'selected':''}>Inativo</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border)">
+      <label>Associar a uma viatura</label>
+      <div style="display:flex;gap:8px;">
+        <select id="teq-viatura-select" style="flex:1">${opcoesViaturas}</select>
+        <button class="btn-secondary" onclick="associarEquipamentoViatura(${e.id})">Associar</button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="salvarEquipamentoTecnico(${e.id})">Salvar status</button>
+    </div>
+  `);
+}
+
+async function salvarEquipamentoTecnico(id) {
+  const dados = { status: document.getElementById('teq-edit-status').value };
+  try {
+    await Equipamentos.atualizar(id, dados);
+    closeModal();
+    showToast('Status do equipamento atualizado!', 'success');
+    await carregarTabelasTecnico();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+async function associarEquipamentoViatura(equipamentoId) {
+  const viaturaId = parseInt(document.getElementById('teq-viatura-select').value);
+  if (!viaturaId) { showToast('Selecione uma viatura.', 'error'); return; }
+  try {
+    await request('POST', `/viaturas/${viaturaId}/equipamentos`, { equipamento_id: equipamentoId, quantidade: 1 });
+    showToast('Equipamento associado à viatura!', 'success');
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// FIX E: placa OU equipamento obrigatórios na manutenção
 function abrirModalNovaManutencao() {
   openModal('Nova manutenção', `
     <div class="form-group">
@@ -854,15 +1172,26 @@ function abrirModalNovaManutencao() {
       <label>Descrição</label>
       <textarea id="manut-descricao" rows="3" placeholder="Descreva a manutenção..."></textarea>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>ID da viatura (opcional)</label>
-        <input type="number" id="manut-viatura" min="1" placeholder="Ex: 1" />
+    <p class="text-muted" style="font-size:12px;margin:8px 0;">
+      Informe a placa da viatura <strong>ou</strong> busque o equipamento pelo nome. Ao menos um é obrigatório.
+    </p>
+    <div class="form-group">
+      <label>Placa da viatura</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="manut-placa" placeholder="Ex: DF-001-AB" style="flex:1" />
+        <button class="btn-secondary" onclick="buscarViaturaParaManutencao()">Buscar</button>
       </div>
-      <div class="form-group">
-        <label>ID do equipamento (opcional)</label>
-        <input type="number" id="manut-equipamento" min="1" placeholder="Ex: 2" />
+      <span id="manut-viatura-info" class="text-muted" style="font-size:12px;"></span>
+      <input type="hidden" id="manut-viatura-id" />
+    </div>
+    <div class="form-group">
+      <label>Nome do equipamento</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="manut-eq-nome" placeholder="Ex: Mangueira de Ataque" style="flex:1" />
+        <button class="btn-secondary" onclick="buscarEquipamentoParaManutencao()">Buscar</button>
       </div>
+      <span id="manut-eq-info" class="text-muted" style="font-size:12px;"></span>
+      <input type="hidden" id="manut-equipamento-id" />
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -881,23 +1210,461 @@ function abrirModalNovaManutencao() {
   `);
 }
 
+async function buscarViaturaParaManutencao() {
+  const placa = document.getElementById('manut-placa').value.trim();
+  if (!placa) { showToast('Informe a placa.', 'error'); return; }
+  try {
+    const viaturas = await Viaturas.listar();
+    const v = viaturas.find((x) => x.placa.toLowerCase() === placa.toLowerCase());
+    if (v) {
+      document.getElementById('manut-viatura-id').value = v.id;
+      document.getElementById('manut-viatura-info').textContent = `✓ ${v.modelo} encontrada (ID: ${v.id})`;
+      document.getElementById('manut-viatura-info').style.color = 'var(--color-encerrada)';
+    } else {
+      document.getElementById('manut-viatura-id').value = '';
+      document.getElementById('manut-viatura-info').textContent = '✗ Viatura não encontrada';
+      document.getElementById('manut-viatura-info').style.color = 'var(--color-critica)';
+    }
+  } catch (erro) { showToast('Erro ao buscar viatura.', 'error'); }
+}
+
+async function buscarEquipamentoParaManutencao() {
+  const nome = document.getElementById('manut-eq-nome').value.trim();
+  if (!nome) { showToast('Informe o nome.', 'error'); return; }
+  try {
+    const equipamentos = await Equipamentos.listar();
+    const e = equipamentos.find((x) => x.nome.toLowerCase().includes(nome.toLowerCase()));
+    if (e) {
+      document.getElementById('manut-equipamento-id').value = e.id;
+      document.getElementById('manut-eq-info').textContent = `✓ ${e.nome} encontrado (ID: ${e.id})`;
+      document.getElementById('manut-eq-info').style.color = 'var(--color-encerrada)';
+    } else {
+      document.getElementById('manut-equipamento-id').value = '';
+      document.getElementById('manut-eq-info').textContent = '✗ Equipamento não encontrado';
+      document.getElementById('manut-eq-info').style.color = 'var(--color-critica)';
+    }
+  } catch (erro) { showToast('Erro ao buscar equipamento.', 'error'); }
+}
+
 async function criarManutencao() {
+  const viaturaId     = parseInt(document.getElementById('manut-viatura-id').value) || null;
+  const equipamentoId = parseInt(document.getElementById('manut-equipamento-id').value) || null;
+
+  // FIX E: ao menos um obrigatório
+  if (!viaturaId && !equipamentoId) {
+    showToast('Busque e selecione uma viatura ou equipamento antes de criar.', 'error');
+    return;
+  }
+
   const dados = {
     tipo:           document.getElementById('manut-tipo').value,
     descricao:      document.getElementById('manut-descricao').value,
-    viatura_id:     parseInt(document.getElementById('manut-viatura').value) || null,
-    equipamento_id: parseInt(document.getElementById('manut-equipamento').value) || null,
+    viatura_id:     viaturaId,
+    equipamento_id: equipamentoId,
     data_inicio:    document.getElementById('manut-inicio').value || null,
     custo:          parseFloat(document.getElementById('manut-custo').value) || null,
   };
+  if (!dados.descricao) { showToast('Informe a descrição.', 'error'); return; }
   try {
     await Manutencoes.criar(dados);
     closeModal();
     showToast('Manutenção criada!', 'success');
     await carregarKanbanManutencoes();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// =============================================
+// VIEW: BOMBEIRO
+// FIX A: Card de treinamento com altura mínima
+// FIX B: Denúncias em leitura — só Comandante altera
+// FIX C: Descrição da denúncia visível
+// =============================================
+
+async function carregarViewBombeiro() {
+  const container = document.getElementById('bombeiro-content');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="resources-grid">
+
+      <!-- FIX B/C: Bombeiro vê denúncias em leitura, com descrição visível -->
+      <div class="resource-card">
+        <div class="resource-card-header">
+          <span class="resource-card-title">📢 Denúncias — base para ocorrências</span>
+        </div>
+        <div id="tabela-denuncias-bombeiro" style="padding:8px;">
+          <div class="empty-state">Carregando...</div>
+        </div>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-card-header">
+          <span class="resource-card-title">🚨 Registrar ocorrência</span>
+          <button class="btn-primary" onclick="abrirModalRegistrarOcorrencia()">+ Nova</button>
+        </div>
+        <div style="padding:16px;color:var(--color-text-muted);font-size:13px;">
+          Após verificar a denúncia, registre a ocorrência com endereço e prioridade.
+          Depois vincule bombeiros e viaturas.
+        </div>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-card-header">
+          <span class="resource-card-title">🔄 Atualizar status de ocorrência</span>
+        </div>
+        <div id="tabela-ocorrencias-bombeiro" style="padding:8px;">
+          <div class="empty-state">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- FIX A: altura mínima para a tabela de treinamentos -->
+      <div class="resource-card" style="min-height:320px;">
+        <div class="resource-card-header">
+          <span class="resource-card-title">🎓 Participar de treinamento</span>
+        </div>
+        <div id="tabela-treinamentos-bombeiro" style="padding:8px;">
+          <div class="empty-state">Carregando...</div>
+        </div>
+      </div>
+
+    </div>
+  `;
+  await carregarDenunciasBombeiro();
+  await carregarTabelaOcorrenciasBombeiro();
+  await carregarTabelaTreinamentosBombeiro();
+}
+
+// FIX B/C: Denúncias em leitura com descrição
+async function carregarDenunciasBombeiro() {
+  const container = document.getElementById('tabela-denuncias-bombeiro');
+  if (!container) return;
+  try {
+    const denuncias = await Denuncias.listar();
+    const tabela = criarTabela(
+      [
+        { label: 'Solicitante', key: 'solicitante' },
+        { label: 'Tipo',        key: 'tipo' },
+        { label: 'Endereço',    key: 'endereco_informado' },
+        // FIX C: Descrição visível
+        { label: 'Descrição',   key: 'descricao' },
+        {
+          label: 'Status',
+          render: (d) => {
+            const mapa = {
+              pendente:   { classe: 'badge-warning', label: 'Pendente' },
+              em_analise: { classe: 'badge-info',    label: 'Em análise' },
+              resolvida:  { classe: 'badge-success', label: 'Resolvida' },
+              arquivada:  { classe: 'badge-muted',   label: 'Arquivada' },
+            };
+            const { classe, label } = mapa[d.status] ?? { classe: 'badge-muted', label: d.status };
+            return `<span class="badge ${classe}">${label}</span>`;
+          },
+        },
+      ],
+      denuncias
+      // FIX B: sem onEditar — Bombeiro só lê, não altera
+    );
+    container.innerHTML = '';
+    container.appendChild(tabela);
   } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
+    container.innerHTML = '<div class="empty-state">Erro ao carregar denúncias.</div>';
   }
+}
+
+async function carregarTabelaOcorrenciasBombeiro() {
+  const container = document.getElementById('tabela-ocorrencias-bombeiro');
+  if (!container) return;
+  try {
+    const ocorrencias = await Ocorrencias.listar();
+    const tabela = criarTabela(
+      [
+        { label: 'Tipo',  key: 'tipo' },
+        { label: 'Local', render: (oc) => oc.endereco?.bairro ?? '—' },
+        {
+          label: 'Status',
+          render: (oc) => {
+            const mapa = {
+              aberta:       { classe: 'badge-warning', label: 'Aberta' },
+              em_andamento: { classe: 'badge-info',    label: 'Em andamento' },
+              encerrada:    { classe: 'badge-success', label: 'Encerrada' },
+            };
+            const { classe, label } = mapa[oc.status] ?? { classe: 'badge-muted', label: oc.status };
+            return `<span class="badge ${classe}">${label}</span>`;
+          },
+        },
+        {
+          label: 'Prioridade',
+          render: (oc) => {
+            const mapa = {
+              critica: { classe: 'badge-critica', label: 'Crítica' },
+              alta:    { classe: 'badge-alta',    label: 'Alta' },
+              media:   { classe: 'badge-media',   label: 'Média' },
+              baixa:   { classe: 'badge-baixa',   label: 'Baixa' },
+            };
+            const { classe, label } = mapa[oc.prioridade] ?? { classe: 'badge-muted', label: oc.prioridade };
+            return `<span class="badge ${classe}">${label}</span>`;
+          },
+        },
+      ],
+      ocorrencias,
+      { onEditar: (oc) => abrirModalAtualizarStatusOcorrencia(oc) }
+    );
+    container.innerHTML = '';
+    container.appendChild(tabela);
+  } catch (erro) {
+    container.innerHTML = '<div class="empty-state">Erro ao carregar ocorrências.</div>';
+  }
+}
+
+// FIX A: tabela de treinamentos com botão acessível
+async function carregarTabelaTreinamentosBombeiro() {
+  const container = document.getElementById('tabela-treinamentos-bombeiro');
+  if (!container) return;
+  try {
+    const treinamentos = await Treinamentos.listar();
+    const tabela = criarTabela(
+      [
+        { label: 'Título',    key: 'titulo' },
+        { label: 'Tipo',      key: 'tipo' },
+        { label: 'Status',    render: badgeStatusTreinamento },
+        { label: 'Instrutor', key: 'instrutor' },
+        { label: 'Carga (h)', key: 'carga_horaria' },
+      ],
+      treinamentos,
+      { onEditar: (t) => abrirModalParticiparTreinamento(t) }
+    );
+    container.innerHTML = '';
+    container.appendChild(tabela);
+  } catch (erro) {
+    container.innerHTML = '<div class="empty-state">Erro ao carregar treinamentos.</div>';
+  }
+}
+
+// FIX #1: Formulário sem lat/lng
+function abrirModalRegistrarOcorrencia() {
+  openModal('Registrar ocorrência', `
+    <div class="form-group">
+      <label>Tipo</label>
+      <select id="oc-tipo">
+        <option value="incendio">Incêndio</option>
+        <option value="acidente">Acidente</option>
+        <option value="resgate">Resgate</option>
+        <option value="inundacao">Inundação</option>
+        <option value="outros">Outros</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="oc-descricao" rows="3" placeholder="Descreva a ocorrência..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Prioridade</label>
+        <select id="oc-prioridade">
+          <option value="baixa">Baixa</option>
+          <option value="media">Média</option>
+          <option value="alta">Alta</option>
+          <option value="critica">Crítica</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nº de vítimas</label>
+        <input type="number" id="oc-vitimas" min="0" value="0" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Logradouro</label>
+      <input type="text" id="oc-logradouro" placeholder="Ex: Eixo Monumental, s/n" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Bairro</label>
+        <input type="text" id="oc-bairro" placeholder="Ex: Asa Norte" />
+      </div>
+      <div class="form-group">
+        <label>Cidade</label>
+        <input type="text" id="oc-cidade" value="Brasília" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="registrarOcorrenciaBombeiro()">Registrar</button>
+    </div>
+  `);
+}
+
+async function registrarOcorrenciaBombeiro() {
+  const dados = {
+    tipo:        document.getElementById('oc-tipo').value,
+    descricao:   document.getElementById('oc-descricao').value,
+    prioridade:  document.getElementById('oc-prioridade').value,
+    num_vitimas: parseInt(document.getElementById('oc-vitimas').value) || 0,
+    endereco: {
+      logradouro: document.getElementById('oc-logradouro').value,
+      bairro:     document.getElementById('oc-bairro').value,
+      cidade:     document.getElementById('oc-cidade').value,
+    },
+  };
+  if (!dados.descricao) { showToast('Informe a descrição.', 'error'); return; }
+  try {
+    await Ocorrencias.criar(dados);
+    closeModal();
+    showToast('Ocorrência registrada!', 'success');
+    await carregarTabelaOcorrenciasBombeiro();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+function abrirModalAtualizarStatusOcorrencia(oc) {
+  openModal(`Ocorrência #${oc.id} — ${oc.tipo}`, `
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="oc-edit-descricao" rows="3">${oc.descricao}</textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Status</label>
+        <select id="oc-edit-status">
+          <option value="aberta"       ${oc.status==='aberta'       ?'selected':''}>Aberta</option>
+          <option value="em_andamento" ${oc.status==='em_andamento' ?'selected':''}>Em andamento</option>
+          <option value="encerrada"    ${oc.status==='encerrada'    ?'selected':''}>Encerrada</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nº de vítimas</label>
+        <input type="number" id="oc-edit-vitimas" min="0" value="${oc.num_vitimas??0}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Vincular bombeiro (matrícula)</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="oc-bombeiro-matricula" placeholder="Ex: CB-001" style="flex:1" />
+        <button class="btn-secondary" onclick="vincularBombeiroOcorrencia(${oc.id})">Vincular</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Adicionar viatura (placa)</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="oc-viatura-placa" placeholder="Ex: DF-001-AB" style="flex:1" />
+        <button class="btn-secondary" onclick="adicionarViaturaOcorrencia(${oc.id})">Adicionar</button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="atualizarStatusOcorrencia(${oc.id})">Salvar</button>
+    </div>
+  `);
+}
+
+async function atualizarStatusOcorrencia(id) {
+  const dados = {
+    status:      document.getElementById('oc-edit-status').value,
+    descricao:   document.getElementById('oc-edit-descricao').value,
+    num_vitimas: parseInt(document.getElementById('oc-edit-vitimas').value) || 0,
+  };
+  try {
+    await Ocorrencias.atualizar(id, dados);
+    closeModal();
+    showToast('Ocorrência atualizada!', 'success');
+    await carregarTabelaOcorrenciasBombeiro();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+async function vincularBombeiroOcorrencia(ocorrenciaId) {
+  const matricula = document.getElementById('oc-bombeiro-matricula').value.trim();
+  if (!matricula) { showToast('Informe a matrícula.', 'error'); return; }
+  try {
+    const bombeiros = await Bombeiros.listar();
+    const b = bombeiros.find((x) => x.matricula.toLowerCase() === matricula.toLowerCase());
+    if (!b) { showToast('Bombeiro não encontrado com essa matrícula.', 'error'); return; }
+    await request('POST', `/ocorrencias/${ocorrenciaId}/bombeiros`, { bombeiro_id: b.id });
+    showToast(`${b.nome} vinculado!`, 'success');
+    document.getElementById('oc-bombeiro-matricula').value = '';
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+async function adicionarViaturaOcorrencia(ocorrenciaId) {
+  const placa = document.getElementById('oc-viatura-placa').value.trim();
+  if (!placa) { showToast('Informe a placa.', 'error'); return; }
+  try {
+    const viaturas = await Viaturas.listar();
+    const v = viaturas.find((x) => x.placa.toLowerCase() === placa.toLowerCase());
+    if (!v) { showToast('Viatura não encontrada com essa placa.', 'error'); return; }
+    await request('POST', `/ocorrencias/${ocorrenciaId}/viaturas`, { viatura_id: v.id });
+    showToast(`Viatura ${v.placa} adicionada!`, 'success');
+    document.getElementById('oc-viatura-placa').value = '';
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// FIX #2: Participar de treinamento usa matrícula
+function abrirModalParticiparTreinamento(t) {
+  openModal(`Participar — ${t.titulo}`, `
+    <div class="form-group">
+      <label>Tipo de treinamento</label>
+      <input type="text" value="${t.tipo==='pratico'?'Prático':'Teórico'}" disabled />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Instrutor</label>
+        <input type="text" value="${t.instrutor??'—'}" disabled />
+      </div>
+      <div class="form-group">
+        <label>Carga horária</label>
+        <input type="text" value="${t.carga_horaria?t.carga_horaria+'h':'—'}" disabled />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Data de início</label>
+        <input type="text" value="${t.data_inicio??'—'}" disabled />
+      </div>
+      <div class="form-group">
+        <label>Data de fim</label>
+        <input type="text" value="${t.data_fim??'—'}" disabled />
+      </div>
+    </div>
+    ${t.descricao ? `
+      <div class="form-group">
+        <label>Descrição</label>
+        <textarea rows="2" disabled>${t.descricao}</textarea>
+      </div>` : ''}
+    <div class="form-group">
+      <label>Matrícula do bombeiro</label>
+      <input type="text" id="part-matricula" placeholder="Ex: CB-001" />
+    </div>
+    <div class="form-group">
+      <label>Status de participação</label>
+      <select id="part-status">
+        <option value="inscrito">Inscrito</option>
+        <option value="concluido">Concluído</option>
+        <option value="ausente">Ausente</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Observação (opcional)</label>
+      <textarea id="part-observacao" rows="2" placeholder="Ex: Participação confirmada"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary"   onclick="participarTreinamento(${t.id})">Confirmar participação</button>
+    </div>
+  `);
+}
+
+async function participarTreinamento(treinamentoId) {
+  const matricula = document.getElementById('part-matricula').value.trim();
+  if (!matricula) { showToast('Informe a matrícula.', 'error'); return; }
+  try {
+    const bombeiros = await Bombeiros.listar();
+    const b = bombeiros.find((x) => x.matricula.toLowerCase() === matricula.toLowerCase());
+    if (!b) { showToast('Bombeiro não encontrado com essa matrícula.', 'error'); return; }
+    const dados = {
+      bombeiro_id:         b.id,
+      status_participacao: document.getElementById('part-status').value,
+      observacao:          document.getElementById('part-observacao').value || null,
+    };
+    await request('POST', `/treinamentos/${treinamentoId}/bombeiros`, dados);
+    closeModal();
+    showToast('Participação registrada!', 'success');
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
@@ -907,7 +1674,6 @@ async function criarManutencao() {
 async function carregarViewCidadao() {
   const container = document.getElementById('cidadao-content');
   if (!container) return;
-
   container.innerHTML = `
     <div class="cidadao-layout">
       <div class="cidadao-form-card">
@@ -951,14 +1717,12 @@ async function carregarViewCidadao() {
       </div>
     </div>
   `;
-
   await carregarOcorrenciasCidadao();
 }
 
 async function carregarOcorrenciasCidadao() {
   const container = document.getElementById('cidadao-ocorrencias');
   if (!container) return;
-
   try {
     const ocorrencias = await Ocorrencias.listar();
     const tabela = criarTabela(
@@ -1009,8 +1773,7 @@ async function enviarDenuncia() {
     descricao:          document.getElementById('den-descricao').value,
   };
   if (!dados.solicitante || !dados.descricao || !dados.endereco_informado) {
-    showToast('Preencha nome, endereço e descrição.', 'error');
-    return;
+    showToast('Preencha nome, endereço e descrição.', 'error'); return;
   }
   try {
     await Denuncias.criar(dados);
@@ -1018,9 +1781,7 @@ async function enviarDenuncia() {
     ['den-nome','den-telefone','den-endereco','den-descricao'].forEach((id) => {
       document.getElementById(id).value = '';
     });
-  } catch (erro) {
-    showToast(`Erro: ${erro.message}`, 'error');
-  }
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
@@ -1030,7 +1791,6 @@ async function enviarDenuncia() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-nova-ocorrencia')
     .addEventListener('click', abrirModalNovaOcorrencia);
-
   inicializarSeletorPerfil();
   inicializarMapa();
   carregarViewComandante();
