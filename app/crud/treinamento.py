@@ -6,6 +6,7 @@ from app.models.enums import StatusTreinamento
 from app.models.treinamento import BombeiroTreinamento, Treinamento
 from app.schemas.treinamento import (
     InscricaoRequest,
+    InscricaoUpdate,
     TreinamentoCreate,
     TreinamentoUpdate,
 )
@@ -88,3 +89,27 @@ def get_inscritos(
         .filter(BombeiroTreinamento.treinamento_id == treinamento_id)
         .all()
     )
+
+
+def update_inscricao(
+    db: Session, treinamento_id: int, bombeiro_id: int, dados: InscricaoUpdate
+) -> BombeiroTreinamento | None:
+    inscricao = (
+        db.query(BombeiroTreinamento)
+        .filter(
+            BombeiroTreinamento.treinamento_id == treinamento_id,
+            BombeiroTreinamento.bombeiro_id == bombeiro_id,
+        )
+        .first()
+    )
+    if not inscricao:
+        return None
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
+        setattr(inscricao, campo, valor)
+    db.commit()
+    db.refresh(inscricao)
+    logger.info(
+        "Inscrição atualizada: treinamento_id=%s bombeiro_id=%s",
+        treinamento_id, bombeiro_id,
+    )
+    return inscricao

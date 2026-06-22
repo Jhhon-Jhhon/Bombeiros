@@ -24,6 +24,7 @@ class StatusViatura(enum.Enum):
     disponivel = "disponivel"
     em_atendimento = "em_atendimento"
     em_manutencao = "em_manutencao"
+    inativa = "inativa"
 
 
 class TipoViatura(enum.Enum):
@@ -76,6 +77,7 @@ class StatusManutencao(enum.Enum):
     pendente = "pendente"
     em_andamento = "em_andamento"
     concluida = "concluida"
+    inativa = "inativa"
 
 
 class TipoTreinamento(enum.Enum):
@@ -100,9 +102,9 @@ class StatusParticipacao(enum.Enum):
 class StatusDenuncia(enum.Enum):
     pendente = "pendente"
     em_analise = "em_analise"
+    aprovada = "aprovada"
     arquivada = "arquivada"
     convertida = "convertida"
-
 
 class StatusSolicitacao(enum.Enum):
     recebida = "recebida"

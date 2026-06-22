@@ -709,3 +709,15 @@ body {
   color: var(--color-text-muted);
   font-size: 13px;
 }
+
+/* Status inativa — manutenção */
+.status-inativa { background: rgba(231,76,60,0.15); color: var(--color-critica); }
+
+/* FIX 1/5: altura mínima nos resource cards para conteúdo não ser cortado */
+.resource-card {
+  min-height: 200px;
+}
+
+.resources-grid {
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+}

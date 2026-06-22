@@ -46,6 +46,12 @@ class InscricaoRequest(BaseModel):
     status_participacao: StatusParticipacao = StatusParticipacao.inscrito
 
 
+class InscricaoUpdate(BaseModel):
+    status_participacao: StatusParticipacao | None = None
+    observacao: str | None = None
+    data_conclusao: date | None = None
+
+
 class InscricaoResponse(BaseModel):
     treinamento_id: int
     bombeiro_id: int

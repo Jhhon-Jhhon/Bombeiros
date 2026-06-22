@@ -11,6 +11,7 @@ from app.crud.treinamento import (
     get_treinamento,
     get_treinamentos,
     inscrever_bombeiro,
+    update_inscricao,
     update_treinamento,
 )
 from app.database import get_db
@@ -18,6 +19,7 @@ from app.models.enums import StatusTreinamento
 from app.schemas.treinamento import (
     InscricaoRequest,
     InscricaoResponse,
+    InscricaoUpdate,
     TreinamentoCreate,
     TreinamentoResponse,
     TreinamentoUpdate,
@@ -111,3 +113,23 @@ def listar_inscritos(treinamento_id: int, db: Session = Depends(get_db)):
             detail=f"Treinamento id={treinamento_id} não encontrado",
         )
     return get_inscritos(db, treinamento_id)
+
+
+@router.put(
+    "/{treinamento_id}/bombeiros/{bombeiro_id}",
+    response_model=InscricaoResponse,
+)
+def atualizar_inscricao_bombeiro(
+    treinamento_id: int,
+    bombeiro_id: int,
+    dados: InscricaoUpdate,
+    db: Session = Depends(get_db),
+):
+    """Atualiza status de participação de um bombeiro no treinamento."""
+    inscricao = update_inscricao(db, treinamento_id, bombeiro_id, dados)
+    if not inscricao:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inscrição não encontrada para treinamento={treinamento_id} bombeiro={bombeiro_id}",
+        )
+    return inscricao

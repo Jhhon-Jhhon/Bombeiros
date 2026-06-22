@@ -10,7 +10,7 @@ class ManutencaoBase(BaseModel):
     tipo: TipoManutencao
     descricao: str | None = None
     custo: Decimal | None = None
-    data_inicio: date
+    data_inicio: date | None = None
     data_fim: date | None = None
     status: StatusManutencao = StatusManutencao.pendente
     viatura_id: int | None = None
@@ -31,8 +31,10 @@ class ManutencaoCreate(ManutencaoBase):
 
 
 class ManutencaoUpdate(BaseModel):
+    tipo: TipoManutencao | None = None
     descricao: str | None = None
     custo: Decimal | None = None
+    data_inicio: date | None = None
     data_fim: date | None = None
     status: StatusManutencao | None = None
 

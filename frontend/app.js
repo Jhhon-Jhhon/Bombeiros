@@ -59,8 +59,6 @@ async function carregarRecursosComandante() {
       }
     ));
 
-    // FIX G/H: Comandante só cria viatura e solicita manutenção
-    // Não pode editar modelo/tipo/status — apenas ver e solicitar manutenção
     grid.appendChild(criarResourceCard('🚒 Viaturas', viaturas,
       [
         { label: 'Placa',  key: 'placa' },
@@ -73,7 +71,6 @@ async function carregarRecursosComandante() {
       }
     ));
 
-    // FIX F: Equipamento — Comandante só visualiza, não edita tipo
     grid.appendChild(criarResourceCard('🧰 Equipamentos', equipamentos,
       [
         { label: 'ID',     key: 'id' },
@@ -104,7 +101,8 @@ async function carregarRecursosComandante() {
         { label: 'Instrutor', key: 'instrutor' },
       ],
       {
-        onEditar: (t) => abrirModalEditarTreinamento(t),
+        // FIX #3: Comandante abre modal com lista de inscritos
+        onEditar: (t) => abrirModalComandanteTreinamento(t),
         btnExtra: { label: '+ Novo', onClick: abrirModalNovoTreinamento },
       }
     ));
@@ -124,8 +122,9 @@ async function carregarRecursosComandante() {
             const mapa = {
               pendente:   { classe: 'badge-warning', label: 'Pendente' },
               em_analise: { classe: 'badge-info',    label: 'Em análise' },
-              resolvida:  { classe: 'badge-success', label: 'Resolvida' },
+              aprovada:   { classe: 'badge-success', label: 'Aprovada' },
               arquivada:  { classe: 'badge-muted',   label: 'Arquivada' },
+              convertida: { classe: 'badge-success', label: 'Convertida' },
             };
             const { classe, label } = mapa[d.status] ?? { classe: 'badge-muted', label: d.status };
             return `<span class="badge ${classe}">${label}</span>`;
@@ -320,9 +319,7 @@ async function deletarBombeiro(id) {
 }
 
 // =============================================
-// MODAIS DO COMANDANTE — Viatura
-// FIX G/H: Comandante só cria viatura e solicita manutenção
-// Não edita modelo/tipo/status — apenas visualiza
+// MODAIS DO COMANDANTE — Viatura (somente leitura)
 // =============================================
 
 function abrirModalNovaViatura() {
@@ -376,8 +373,6 @@ async function criarViatura() {
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-// FIX G/H: Modal do Comandante para viatura é SOMENTE LEITURA
-// Apenas mostra dados e permite solicitar manutenção
 function abrirModalComandanteViatura(v) {
   const statusLabel = {
     disponivel:     'Disponível',
@@ -412,7 +407,7 @@ function abrirModalComandanteViatura(v) {
     </div>
     ${!podeSolicitarManutencao ? `
       <p class="text-muted" style="font-size:12px;margin-top:8px;">
-        ⚠ Viatura indisponível para manutenção no momento (status: ${statusLabel}).
+        ⚠ Viatura indisponível para manutenção (status: ${statusLabel}).
       </p>` : ''}
     <div class="form-actions">
       <button class="btn-secondary" onclick="closeModal()">Fechar</button>
@@ -456,7 +451,7 @@ async function confirmarSolicitacaoManutencao(viaturaId) {
     });
     await Viaturas.atualizar(viaturaId, { status: 'em_manutencao' });
     closeModal();
-    showToast('Manutenção solicitada! Viatura marcada como em manutenção.', 'success');
+    showToast('Manutenção solicitada!', 'success');
     await carregarRecursosComandante();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
@@ -610,6 +605,7 @@ async function removerMembroEquipe(equipeId, bombeiroId, equipeNome) {
 
 // =============================================
 // MODAIS DO COMANDANTE — Treinamentos
+// FIX #3: Comandante vê inscritos e marca presença
 // =============================================
 
 function abrirModalNovoTreinamento() {
@@ -667,60 +663,102 @@ function abrirModalNovoTreinamento() {
   `);
 }
 
-function abrirModalEditarTreinamento(t) {
-  openModal(`Treinamento — ${t.titulo}`, `
-    <div class="form-group">
-      <label>Título</label>
-      <input type="text" id="tr-titulo" value="${t.titulo}" />
-    </div>
-    <div class="form-row">
+// FIX #3: Modal do Comandante para treinamento — edita + vê inscritos + marca presença
+async function abrirModalComandanteTreinamento(t) {
+  openModal(`Treinamento — ${t.titulo}`, '<div class="empty-state">Carregando participantes...</div>');
+
+  try {
+    const [participantes, bombeiros] = await Promise.all([
+      request('GET', `/treinamentos/${t.id}/bombeiros`),
+      Bombeiros.listar(),
+    ]);
+
+    const listaParticipantes = participantes.length > 0
+      ? participantes.map((p) => {
+          const b = bombeiros.find((x) => x.id === p.bombeiro_id);
+          const nome = b ? `${b.nome} (${b.matricula})` : `Bombeiro #${p.bombeiro_id}`;
+          const badgeStatus = {
+            inscrito:  '<span class="badge badge-info">Inscrito</span>',
+            concluido: '<span class="badge badge-success">Concluído</span>',
+            reprovado: '<span class="badge badge-danger">Reprovado</span>',
+            desistiu:  '<span class="badge badge-muted">Desistiu</span>',
+          }[p.status_participacao] ?? `<span class="badge badge-muted">${p.status_participacao}</span>`;
+
+          return `<div style="display:flex;justify-content:space-between;align-items:center;
+                      padding:8px 0;border-bottom:1px solid var(--color-border);gap:8px;">
+            <span style="flex:1">${nome}</span>
+            ${badgeStatus}
+            <select onchange="atualizarParticipacao(${t.id}, ${p.bombeiro_id}, this.value)"
+              style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);
+                     border-radius:6px;padding:4px 8px;font-size:12px;">
+              <option value="inscrito"  ${p.status_participacao==='inscrito'  ?'selected':''}>Inscrito</option>
+              <option value="concluido" ${p.status_participacao==='concluido' ?'selected':''}>Concluído</option>
+              <option value="reprovado" ${p.status_participacao==='reprovado' ?'selected':''}>Reprovado</option>
+              <option value="desistiu"  ${p.status_participacao==='desistiu'  ?'selected':''}>Desistiu</option>
+            </select>
+          </div>`;
+        }).join('')
+      : '<div class="empty-state">Nenhum bombeiro inscrito ainda.</div>';
+
+    document.getElementById('modal-body').innerHTML = `
       <div class="form-group">
-        <label>Tipo</label>
-        <select id="tr-tipo">
-          <option value="teorico" ${t.tipo==='teorico'?'selected':''}>Teórico</option>
-          <option value="pratico" ${t.tipo==='pratico'?'selected':''}>Prático</option>
-        </select>
+        <label>Título</label>
+        <input type="text" id="tr-titulo" value="${t.titulo}" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="tr-tipo">
+            <option value="teorico" ${t.tipo==='teorico'?'selected':''}>Teórico</option>
+            <option value="pratico" ${t.tipo==='pratico'?'selected':''}>Prático</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="tr-status">
+            <option value="agendado"     ${t.status==='agendado'    ?'selected':''}>Agendado</option>
+            <option value="em_andamento" ${t.status==='em_andamento'?'selected':''}>Em andamento</option>
+            <option value="concluido"    ${t.status==='concluido'   ?'selected':''}>Concluído</option>
+            <option value="cancelado"    ${t.status==='cancelado'   ?'selected':''}>Cancelado</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Instrutor</label>
+          <input type="text" id="tr-instrutor" value="${t.instrutor??''}" />
+        </div>
+        <div class="form-group">
+          <label>Carga horária (h)</label>
+          <input type="number" id="tr-carga" min="1" value="${t.carga_horaria??''}" />
+        </div>
       </div>
       <div class="form-group">
-        <label>Status</label>
-        <select id="tr-status">
-          <option value="agendado"     ${t.status==='agendado'    ?'selected':''}>Agendado</option>
-          <option value="em_andamento" ${t.status==='em_andamento'?'selected':''}>Em andamento</option>
-          <option value="concluido"    ${t.status==='concluido'   ?'selected':''}>Concluído</option>
-          <option value="cancelado"    ${t.status==='cancelado'   ?'selected':''}>Cancelado</option>
-        </select>
+        <label>👥 Participantes inscritos</label>
+        <div style="max-height:200px;overflow-y:auto;border:1px solid var(--color-border);
+                    border-radius:8px;padding:8px;">${listaParticipantes}</div>
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Instrutor</label>
-        <input type="text" id="tr-instrutor" value="${t.instrutor??''}" />
+      <div class="form-actions">
+        <button class="btn-danger"    onclick="deletarTreinamento(${t.id})">Excluir</button>
+        <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button class="btn-primary"   onclick="salvarTreinamento(${t.id})">Salvar</button>
       </div>
-      <div class="form-group">
-        <label>Carga horária (h)</label>
-        <input type="number" id="tr-carga" min="1" value="${t.carga_horaria??''}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Data de início</label>
-        <input type="date" id="tr-inicio" value="${t.data_inicio??''}" />
-      </div>
-      <div class="form-group">
-        <label>Data de fim</label>
-        <input type="date" id="tr-fim" value="${t.data_fim??''}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Descrição</label>
-      <textarea id="tr-descricao" rows="3">${t.descricao??''}</textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn-danger"    onclick="deletarTreinamento(${t.id})">Excluir</button>
-      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary"   onclick="salvarTreinamento(${t.id})">Salvar</button>
-    </div>
-  `);
+    `;
+  } catch (erro) {
+    document.getElementById('modal-body').innerHTML = '<div class="empty-state">Erro ao carregar participantes.</div>';
+  }
+}
+
+// FIX #3: Comandante atualiza status de participação de um bombeiro
+async function atualizarParticipacao(treinamentoId, bombeiroId, novoStatus) {
+  try {
+    await request('PUT', `/treinamentos/${treinamentoId}/bombeiros/${bombeiroId}`, {
+      status_participacao: novoStatus,
+    });
+    showToast('Participação atualizada!', 'success');
+  } catch (erro) {
+    showToast(`Erro: ${erro.message}`, 'error');
+  }
 }
 
 async function criarTreinamento() {
@@ -750,9 +788,9 @@ async function salvarTreinamento(id) {
     status:        document.getElementById('tr-status').value,
     instrutor:     document.getElementById('tr-instrutor').value || null,
     carga_horaria: parseInt(document.getElementById('tr-carga').value) || null,
-    data_inicio:   document.getElementById('tr-inicio').value || null,
-    data_fim:      document.getElementById('tr-fim').value || null,
-    descricao:     document.getElementById('tr-descricao').value || null,
+    data_inicio:   document.getElementById('tr-inicio')?.value || null,
+    data_fim:      document.getElementById('tr-fim')?.value || null,
+    descricao:     document.getElementById('tr-descricao')?.value || null,
   };
   try {
     await Treinamentos.atualizar(id, dados);
@@ -773,7 +811,8 @@ async function deletarTreinamento(id) {
 }
 
 // =============================================
-// MODAIS DO COMANDANTE — Denúncias e Solicitações
+// MODAIS DO COMANDANTE — Denúncias
+// FIX #5: status "aprovada" em vez de "resolvida"
 // =============================================
 
 function abrirModalVerificarDenuncia(d) {
@@ -805,7 +844,7 @@ function abrirModalVerificarDenuncia(d) {
       <select id="den-status">
         <option value="pendente"   ${d.status==='pendente'   ?'selected':''}>Pendente</option>
         <option value="em_analise" ${d.status==='em_analise' ?'selected':''}>Em análise</option>
-        <option value="resolvida"  ${d.status==='resolvida'  ?'selected':''}>Resolvida</option>
+        <option value="aprovada"   ${d.status==='aprovada'   ?'selected':''}>Aprovada</option>
         <option value="arquivada"  ${d.status==='arquivada'  ?'selected':''}>Arquivada</option>
       </select>
     </div>
@@ -870,71 +909,7 @@ async function avaliarSolicitacao(id) {
 }
 
 // =============================================
-// FIX I: Encerrar ocorrência no Kanban do Comandante
-// Ocorrências não são deletadas — são encerradas (status = encerrada)
-// =============================================
-
-// Esta função é chamada pelo kanban.js ao clicar num card
-function abrirModalOcorrencia(oc) {
-  const duracao = oc.data_encerramento
-    ? calcularDuracao(oc.data_abertura, oc.data_encerramento)
-    : null;
-
-  openModal(`Ocorrência #${oc.id}`, `
-    <div class="form-group">
-      <label>Tipo</label>
-      <select id="edit-tipo">
-        <option value="incendio"  ${oc.tipo==='incendio'  ?'selected':''}>Incêndio</option>
-        <option value="acidente"  ${oc.tipo==='acidente'  ?'selected':''}>Acidente</option>
-        <option value="resgate"   ${oc.tipo==='resgate'   ?'selected':''}>Resgate</option>
-        <option value="inundacao" ${oc.tipo==='inundacao' ?'selected':''}>Inundação</option>
-        <option value="outros"    ${oc.tipo==='outros'    ?'selected':''}>Outros</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Descrição</label>
-      <textarea id="edit-descricao" rows="3">${oc.descricao}</textarea>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Prioridade</label>
-        <select id="edit-prioridade">
-          <option value="baixa"   ${oc.prioridade==='baixa'   ?'selected':''}>Baixa</option>
-          <option value="media"   ${oc.prioridade==='media'   ?'selected':''}>Média</option>
-          <option value="alta"    ${oc.prioridade==='alta'    ?'selected':''}>Alta</option>
-          <option value="critica" ${oc.prioridade==='critica' ?'selected':''}>Crítica</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Status</label>
-        <select id="edit-status">
-          <option value="aberta"       ${oc.status==='aberta'       ?'selected':''}>Aberta</option>
-          <option value="em_andamento" ${oc.status==='em_andamento' ?'selected':''}>Em andamento</option>
-          <option value="encerrada"    ${oc.status==='encerrada'    ?'selected':''}>Encerrada</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Nº de vítimas</label>
-      <input type="number" id="edit-vitimas" min="0" value="${oc.num_vitimas??0}" />
-    </div>
-    ${duracao ? `
-      <div class="form-group">
-        <label>Duração do atendimento</label>
-        <input type="text" value="${duracao}" disabled />
-      </div>` : ''}
-    <div class="form-actions">
-      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary"   onclick="salvarEdicaoOcorrencia(${oc.id})">Salvar</button>
-    </div>
-  `);
-}
-
-// =============================================
 // VIEW: TÉCNICO
-// FIX D: Equipamentos com ID visível
-// FIX E: Placa/equipamento obrigatórios na manutenção
-// FIX F: Tipo do equipamento não editável
 // =============================================
 
 async function carregarViewTecnico() {
@@ -947,7 +922,7 @@ async function carregarViewTecnico() {
           <span class="panel-title">Kanban de manutenções</span>
           <button class="btn-primary" onclick="abrirModalNovaManutencao()">+ Nova</button>
         </div>
-        <div class="kanban-board">
+        <div class="kanban-board" style="grid-template-columns: repeat(4, 1fr);">
           <div class="kanban-col">
             <div class="kanban-col-header status-pendente">
               Pendente <span class="col-count" id="count-manut-pendente">0</span>
@@ -965,6 +940,12 @@ async function carregarViewTecnico() {
               Concluída <span class="col-count" id="count-manut-concluida">0</span>
             </div>
             <div class="kanban-cards" id="col-manut-concluida"></div>
+          </div>
+          <div class="kanban-col">
+            <div class="kanban-col-header status-inativa">
+              Inativa <span class="col-count" id="count-manut-inativa">0</span>
+            </div>
+            <div class="kanban-cards" id="col-manut-inativa"></div>
           </div>
         </div>
       </div>
@@ -999,7 +980,6 @@ async function carregarTabelasTecnico() {
       { onEditar: (v) => abrirModalTecnicoViatura(v) }
     ));
 
-    // FIX D: coluna ID visível
     const cardE = document.getElementById('card-equipamentos-tecnico');
     cardE.innerHTML = `<div class="resource-card-header">
       <span class="resource-card-title">🧰 Equipamentos</span>
@@ -1098,7 +1078,6 @@ async function criarEquipamentoTecnico() {
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-// FIX F: Tipo não editável — apenas status e associação a viatura
 async function abrirModalTecnicoEquipamento(e) {
   const viaturas = await Viaturas.listar();
   const opcoesViaturas = viaturas.map((v) =>
@@ -1158,7 +1137,6 @@ async function associarEquipamentoViatura(equipamentoId) {
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-// FIX E: placa OU equipamento obrigatórios na manutenção
 function abrirModalNovaManutencao() {
   openModal('Nova manutenção', `
     <div class="form-group">
@@ -1173,7 +1151,7 @@ function abrirModalNovaManutencao() {
       <textarea id="manut-descricao" rows="3" placeholder="Descreva a manutenção..."></textarea>
     </div>
     <p class="text-muted" style="font-size:12px;margin:8px 0;">
-      Informe a placa da viatura <strong>ou</strong> busque o equipamento pelo nome. Ao menos um é obrigatório.
+      Busque a viatura pela placa <strong>ou</strong> o equipamento pelo nome. Ao menos um é obrigatório.
     </p>
     <div class="form-group">
       <label>Placa da viatura</label>
@@ -1249,13 +1227,10 @@ async function buscarEquipamentoParaManutencao() {
 async function criarManutencao() {
   const viaturaId     = parseInt(document.getElementById('manut-viatura-id').value) || null;
   const equipamentoId = parseInt(document.getElementById('manut-equipamento-id').value) || null;
-
-  // FIX E: ao menos um obrigatório
   if (!viaturaId && !equipamentoId) {
     showToast('Busque e selecione uma viatura ou equipamento antes de criar.', 'error');
     return;
   }
-
   const dados = {
     tipo:           document.getElementById('manut-tipo').value,
     descricao:      document.getElementById('manut-descricao').value,
@@ -1275,18 +1250,25 @@ async function criarManutencao() {
 
 // =============================================
 // VIEW: BOMBEIRO
-// FIX A: Card de treinamento com altura mínima
-// FIX B: Denúncias em leitura — só Comandante altera
-// FIX C: Descrição da denúncia visível
+// FIX #2: participação só confirma inscrição
+// FIX #4: ocorrência só vai para em_andamento
+// FIX #4: só registra ocorrência se houver denúncia aprovada
 // =============================================
 
 async function carregarViewBombeiro() {
   const container = document.getElementById('bombeiro-content');
   if (!container) return;
+
+  // FIX #4: verifica se há denúncias aprovadas
+  let temDenunciaAprovada = false;
+  try {
+    const denuncias = await Denuncias.listar();
+    temDenunciaAprovada = denuncias.some((d) => d.status === 'aprovada');
+  } catch (e) {}
+
   container.innerHTML = `
     <div class="resources-grid">
 
-      <!-- FIX B/C: Bombeiro vê denúncias em leitura, com descrição visível -->
       <div class="resource-card">
         <div class="resource-card-header">
           <span class="resource-card-title">📢 Denúncias — base para ocorrências</span>
@@ -1299,11 +1281,16 @@ async function carregarViewBombeiro() {
       <div class="resource-card">
         <div class="resource-card-header">
           <span class="resource-card-title">🚨 Registrar ocorrência</span>
-          <button class="btn-primary" onclick="abrirModalRegistrarOcorrencia()">+ Nova</button>
+          ${temDenunciaAprovada
+            ? `<button class="btn-primary" onclick="abrirModalRegistrarOcorrencia()">+ Nova</button>`
+            : `<span class="badge badge-muted" title="Aguarde uma denúncia aprovada pelo Comandante">
+                 Aguardando aprovação
+               </span>`}
         </div>
         <div style="padding:16px;color:var(--color-text-muted);font-size:13px;">
-          Após verificar a denúncia, registre a ocorrência com endereço e prioridade.
-          Depois vincule bombeiros e viaturas.
+          ${temDenunciaAprovada
+            ? 'Há denúncias aprovadas. Registre a ocorrência com endereço e prioridade.'
+            : '⚠ O Comandante deve aprovar uma denúncia antes de registrar a ocorrência.'}
         </div>
       </div>
 
@@ -1316,7 +1303,6 @@ async function carregarViewBombeiro() {
         </div>
       </div>
 
-      <!-- FIX A: altura mínima para a tabela de treinamentos -->
       <div class="resource-card" style="min-height:320px;">
         <div class="resource-card-header">
           <span class="resource-card-title">🎓 Participar de treinamento</span>
@@ -1328,12 +1314,12 @@ async function carregarViewBombeiro() {
 
     </div>
   `;
+
   await carregarDenunciasBombeiro();
   await carregarTabelaOcorrenciasBombeiro();
   await carregarTabelaTreinamentosBombeiro();
 }
 
-// FIX B/C: Denúncias em leitura com descrição
 async function carregarDenunciasBombeiro() {
   const container = document.getElementById('tabela-denuncias-bombeiro');
   if (!container) return;
@@ -1344,7 +1330,6 @@ async function carregarDenunciasBombeiro() {
         { label: 'Solicitante', key: 'solicitante' },
         { label: 'Tipo',        key: 'tipo' },
         { label: 'Endereço',    key: 'endereco_informado' },
-        // FIX C: Descrição visível
         { label: 'Descrição',   key: 'descricao' },
         {
           label: 'Status',
@@ -1352,7 +1337,7 @@ async function carregarDenunciasBombeiro() {
             const mapa = {
               pendente:   { classe: 'badge-warning', label: 'Pendente' },
               em_analise: { classe: 'badge-info',    label: 'Em análise' },
-              resolvida:  { classe: 'badge-success', label: 'Resolvida' },
+              aprovada:   { classe: 'badge-success', label: 'Aprovada' },
               arquivada:  { classe: 'badge-muted',   label: 'Arquivada' },
             };
             const { classe, label } = mapa[d.status] ?? { classe: 'badge-muted', label: d.status };
@@ -1361,7 +1346,6 @@ async function carregarDenunciasBombeiro() {
         },
       ],
       denuncias
-      // FIX B: sem onEditar — Bombeiro só lê, não altera
     );
     container.innerHTML = '';
     container.appendChild(tabela);
@@ -1405,7 +1389,8 @@ async function carregarTabelaOcorrenciasBombeiro() {
           },
         },
       ],
-      ocorrencias,
+      // FIX #4: só mostra ocorrências abertas ou em andamento para o bombeiro atualizar
+      ocorrencias.filter((oc) => oc.status !== 'encerrada'),
       { onEditar: (oc) => abrirModalAtualizarStatusOcorrencia(oc) }
     );
     container.innerHTML = '';
@@ -1415,7 +1400,6 @@ async function carregarTabelaOcorrenciasBombeiro() {
   }
 }
 
-// FIX A: tabela de treinamentos com botão acessível
 async function carregarTabelaTreinamentosBombeiro() {
   const container = document.getElementById('tabela-treinamentos-bombeiro');
   if (!container) return;
@@ -1439,7 +1423,6 @@ async function carregarTabelaTreinamentosBombeiro() {
   }
 }
 
-// FIX #1: Formulário sem lat/lng
 function abrirModalRegistrarOcorrencia() {
   openModal('Registrar ocorrência', `
     <div class="form-group">
@@ -1513,6 +1496,7 @@ async function registrarOcorrenciaBombeiro() {
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
+// FIX #4: Bombeiro só pode mover para em_andamento
 function abrirModalAtualizarStatusOcorrencia(oc) {
   openModal(`Ocorrência #${oc.id} — ${oc.tipo}`, `
     <div class="form-group">
@@ -1525,7 +1509,6 @@ function abrirModalAtualizarStatusOcorrencia(oc) {
         <select id="oc-edit-status">
           <option value="aberta"       ${oc.status==='aberta'       ?'selected':''}>Aberta</option>
           <option value="em_andamento" ${oc.status==='em_andamento' ?'selected':''}>Em andamento</option>
-          <option value="encerrada"    ${oc.status==='encerrada'    ?'selected':''}>Encerrada</option>
         </select>
       </div>
       <div class="form-group">
@@ -1533,6 +1516,9 @@ function abrirModalAtualizarStatusOcorrencia(oc) {
         <input type="number" id="oc-edit-vitimas" min="0" value="${oc.num_vitimas??0}" />
       </div>
     </div>
+    <p class="text-muted" style="font-size:12px;margin-top:4px;">
+      ⚠ Para encerrar a ocorrência, solicite ao Comandante.
+    </p>
     <div class="form-group">
       <label>Vincular bombeiro (matrícula)</label>
       <div style="display:flex;gap:8px;">
@@ -1574,7 +1560,7 @@ async function vincularBombeiroOcorrencia(ocorrenciaId) {
   try {
     const bombeiros = await Bombeiros.listar();
     const b = bombeiros.find((x) => x.matricula.toLowerCase() === matricula.toLowerCase());
-    if (!b) { showToast('Bombeiro não encontrado com essa matrícula.', 'error'); return; }
+    if (!b) { showToast('Bombeiro não encontrado.', 'error'); return; }
     await request('POST', `/ocorrencias/${ocorrenciaId}/bombeiros`, { bombeiro_id: b.id });
     showToast(`${b.nome} vinculado!`, 'success');
     document.getElementById('oc-bombeiro-matricula').value = '';
@@ -1587,14 +1573,14 @@ async function adicionarViaturaOcorrencia(ocorrenciaId) {
   try {
     const viaturas = await Viaturas.listar();
     const v = viaturas.find((x) => x.placa.toLowerCase() === placa.toLowerCase());
-    if (!v) { showToast('Viatura não encontrada com essa placa.', 'error'); return; }
+    if (!v) { showToast('Viatura não encontrada.', 'error'); return; }
     await request('POST', `/ocorrencias/${ocorrenciaId}/viaturas`, { viatura_id: v.id });
     showToast(`Viatura ${v.placa} adicionada!`, 'success');
     document.getElementById('oc-viatura-placa').value = '';
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-// FIX #2: Participar de treinamento usa matrícula
+// FIX #2: Bombeiro só confirma inscrição — sem escolher status
 function abrirModalParticiparTreinamento(t) {
   openModal(`Participar — ${t.titulo}`, `
     <div class="form-group">
@@ -1627,43 +1613,34 @@ function abrirModalParticiparTreinamento(t) {
         <textarea rows="2" disabled>${t.descricao}</textarea>
       </div>` : ''}
     <div class="form-group">
-      <label>Matrícula do bombeiro</label>
+      <label>Sua matrícula</label>
       <input type="text" id="part-matricula" placeholder="Ex: CB-001" />
     </div>
-    <div class="form-group">
-      <label>Status de participação</label>
-      <select id="part-status">
-        <option value="inscrito">Inscrito</option>
-        <option value="concluido">Concluído</option>
-        <option value="ausente">Ausente</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Observação (opcional)</label>
-      <textarea id="part-observacao" rows="2" placeholder="Ex: Participação confirmada"></textarea>
-    </div>
+    <p class="text-muted" style="font-size:12px;">
+      Ao confirmar, sua inscrição será registrada com status <strong>Inscrito</strong>.
+      O Comandante atualizará após o treinamento.
+    </p>
     <div class="form-actions">
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary"   onclick="participarTreinamento(${t.id})">Confirmar participação</button>
+      <button class="btn-primary"   onclick="participarTreinamento(${t.id})">Confirmar inscrição</button>
     </div>
   `);
 }
 
+// FIX #2: status fixo = inscrito
 async function participarTreinamento(treinamentoId) {
   const matricula = document.getElementById('part-matricula').value.trim();
-  if (!matricula) { showToast('Informe a matrícula.', 'error'); return; }
+  if (!matricula) { showToast('Informe sua matrícula.', 'error'); return; }
   try {
     const bombeiros = await Bombeiros.listar();
     const b = bombeiros.find((x) => x.matricula.toLowerCase() === matricula.toLowerCase());
-    if (!b) { showToast('Bombeiro não encontrado com essa matrícula.', 'error'); return; }
-    const dados = {
+    if (!b) { showToast('Matrícula não encontrada.', 'error'); return; }
+    await request('POST', `/treinamentos/${treinamentoId}/bombeiros`, {
       bombeiro_id:         b.id,
-      status_participacao: document.getElementById('part-status').value,
-      observacao:          document.getElementById('part-observacao').value || null,
-    };
-    await request('POST', `/treinamentos/${treinamentoId}/bombeiros`, dados);
+      status_participacao: 'inscrito',
+    });
     closeModal();
-    showToast('Participação registrada!', 'success');
+    showToast(`${b.nome} inscrito no treinamento!`, 'success');
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
