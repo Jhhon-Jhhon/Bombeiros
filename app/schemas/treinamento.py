@@ -28,10 +28,14 @@ class TreinamentoCreate(TreinamentoBase):
 
 
 class TreinamentoUpdate(BaseModel):
+    titulo: str | None = None
+    tipo: TipoTreinamento | None = None
     descricao: str | None = None
     instrutor: str | None = None
-    status: StatusTreinamento | None = None
+    carga_horaria: int | None = None
+    data_inicio: date | None = None
     data_fim: date | None = None
+    status: StatusTreinamento | None = None
 
 
 class TreinamentoResponse(TreinamentoBase):
