@@ -45,7 +45,7 @@ def update_treinamento(
     treinamento = get_treinamento(db, treinamento_id)
     if not treinamento:
         return None
-    for campo, valor in dados.model_dump(exclude_unset=True).items():
+    for campo, valor in dados.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(treinamento, campo, valor)
     db.commit()
     db.refresh(treinamento)
