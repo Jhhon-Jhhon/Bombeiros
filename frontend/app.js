@@ -84,7 +84,6 @@ async function carregarRecursosComandante() {
     ));
 
     const [todasDen, todasSol] = await Promise.all([Denuncias.listar(), Solicitacoes.listar()]);
-    // Ocultar denuncias aprovadas/arquivadas e solicitacoes convertidas/arquivadas
     const denuncias = todasDen.filter((d) => !['aprovada','arquivada','convertida'].includes(d.status));
     const solicitacoes = todasSol.filter((s) => !['convertida','arquivada'].includes(s.status) && !s.arquivada);
 
@@ -336,9 +335,12 @@ async function confirmarSolicitacaoManutencao(viaturaId) {
   const descricao = document.getElementById('sol-manut-desc').value;
   if (!descricao) { showToast('Informe a descricao.', 'error'); return; }
   try {
+    // Cria a manutencao e ja marca a viatura como em_manutencao
     await Manutencoes.criar({ tipo, descricao, viatura_id: viaturaId, data_inicio: new Date().toISOString().split('T')[0] });
     await Viaturas.atualizar(viaturaId, { status: 'em_manutencao' });
-    closeModal(); showToast('Manutencao solicitada!', 'success'); await carregarRecursosComandante();
+    closeModal();
+    showToast('Manutencao solicitada! Viatura marcada como em manutencao.', 'success');
+    await carregarRecursosComandante();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
@@ -718,7 +720,9 @@ async function carregarTabelasTecnico() {
     cardV.innerHTML = `<div class="resource-card-header"><span class="resource-card-title">Viaturas</span></div>`;
     cardV.appendChild(criarTabela(
       [{ label:'Placa',key:'placa'},{label:'Modelo',key:'modelo'},{label:'Status',render:badgeStatusViatura}],
-      viaturas, { onEditar: (v) => abrirModalTecnicoViatura(v) }
+      viaturas,
+      // Tecnico pode clicar para ver detalhes mas status muda automaticamente pelo kanban
+      { onEditar: (v) => abrirModalTecnicoViatura(v) }
     ));
     const cardE = document.getElementById('card-equipamentos-tecnico');
     cardE.innerHTML = `<div class="resource-card-header"><span class="resource-card-title">Equipamentos</span>
@@ -730,28 +734,33 @@ async function carregarTabelasTecnico() {
   } catch (erro) { showToast('Erro ao carregar dados do tecnico.', 'error'); }
 }
 
+// Viatura: tecnico ve status (somente leitura) — status muda automaticamente via kanban de manutencoes
 function abrirModalTecnicoViatura(v) {
+  const statusLabel = {
+    disponivel: 'Disponivel',
+    em_manutencao: 'Em manutencao',
+    em_atendimento: 'Em atendimento',
+    inativa: 'Inativa',
+  }[v.status] ?? v.status;
+  const corStatus = {
+    disponivel: 'var(--color-encerrada)',
+    em_manutencao: 'var(--color-alta)',
+    inativa: 'var(--color-text-muted)',
+  }[v.status] ?? 'var(--color-text-muted)';
+
   openModal(`Viatura - ${v.placa}`, `
     <div class="form-group"><label>Modelo</label><input type="text" value="${v.modelo}" disabled /></div>
-    <div class="form-group"><label>Status</label>
-      <select id="tecnico-v-status">
-        <option value="disponivel" ${v.status==='disponivel'?'selected':''}>Disponivel</option>
-        <option value="em_manutencao" ${v.status==='em_manutencao'?'selected':''}>Em manutencao</option>
-        <option value="inativa" ${v.status==='inativa'?'selected':''}>Inativa</option>
-      </select>
+    <div class="form-group"><label>Status atual</label>
+      <input type="text" value="${statusLabel}" disabled style="color:${corStatus};font-weight:600;" />
     </div>
-    <p class="text-muted" style="font-size:12px;">O Tecnico e responsavel por liberar a viatura como disponivel.</p>
+    <p class="text-muted" style="font-size:12px;">
+      O status da viatura e alterado automaticamente:<br>
+      &bull; <strong>Em manutencao</strong> ao criar manutencao para ela no kanban<br>
+      &bull; <strong>Disponivel</strong> ao marcar manutencao como Concluida ou Inativa
+    </p>
     <div class="form-actions">
-      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" onclick="tecnicoAtualizarViatura(${v.id})">Atualizar status</button>
+      <button class="btn-primary" onclick="closeModal()">Fechar</button>
     </div>`);
-}
-
-async function tecnicoAtualizarViatura(id) {
-  const dados = { status: document.getElementById('tecnico-v-status').value };
-  try {
-    await Viaturas.atualizar(id, dados); closeModal(); showToast('Status atualizado!', 'success'); await carregarTabelasTecnico();
-  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 function abrirModalNovoEquipamento() {
@@ -781,33 +790,58 @@ async function criarEquipamentoTecnico() {
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
+// Equipamento: status muda automaticamente. Tecnico so pode associar a viatura ou excluir (se inativo)
 async function abrirModalTecnicoEquipamento(e) {
+  // Apenas viaturas disponiveis ou em atendimento podem receber equipamentos
   const viaturas = await Viaturas.listar();
-  const opcoesViaturas = viaturas.map((v) => `<option value="${v.id}">${v.placa} - ${v.modelo}</option>`).join('');
+  const viaturasPossiveis = viaturas.filter((v) => ['disponivel','em_atendimento'].includes(v.status));
+  const opcoesViaturas = viaturasPossiveis.length > 0
+    ? viaturasPossiveis.map((v) => `<option value="${v.id}">${v.placa} - ${v.modelo}</option>`).join('')
+    : '<option disabled value="">Nenhuma viatura disponivel</option>';
+
+  const statusLabel = { disponivel:'Disponivel', em_uso:'Em uso', em_manutencao:'Em manutencao', inativo:'Inativo' }[e.status] ?? e.status;
+  const corStatus = { disponivel:'var(--color-encerrada)', em_uso:'var(--color-info)', em_manutencao:'var(--color-alta)', inativo:'var(--color-text-muted)' }[e.status] ?? 'var(--color-text-muted)';
+
   openModal(`Equipamento #${e.id} - ${e.nome}`, `
     <div class="form-group"><label>Nome</label><input type="text" value="${e.nome}" disabled /></div>
     <div class="form-row">
       <div class="form-group"><label>Tipo</label><input type="text" value="${e.tipo}" disabled /></div>
-      <div class="form-group"><label>Status</label>
-        <select id="teq-edit-status">
-          <option value="disponivel" ${e.status==='disponivel'?'selected':''}>Disponivel</option>
-          <option value="em_uso" ${e.status==='em_uso'?'selected':''}>Em uso</option>
-          <option value="em_manutencao" ${e.status==='em_manutencao'?'selected':''}>Em manutencao</option>
-          <option value="inativo" ${e.status==='inativo'?'selected':''}>Inativo</option>
-        </select>
+      <div class="form-group"><label>Status atual</label>
+        <input type="text" value="${statusLabel}" disabled style="color:${corStatus};font-weight:600;" />
       </div>
     </div>
+    <p class="text-muted" style="font-size:12px;">
+      O status muda automaticamente:<br>
+      &bull; <strong>Em uso</strong> ao associar a uma viatura<br>
+      &bull; <strong>Em manutencao</strong> ao criar manutencao no kanban (desvincula da viatura)<br>
+      &bull; <strong>Disponivel</strong> ao concluir/inativar a manutencao no kanban
+    </p>
+    ${e.status === 'disponivel' ? `
     <div class="form-group" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border)">
       <label>Associar a uma viatura</label>
       <div style="display:flex;gap:8px;">
         <select id="teq-viatura-select" style="flex:1">${opcoesViaturas}</select>
-        <button class="btn-secondary" onclick="associarEquipamentoViatura(${e.id})">Associar</button>
+        <button class="btn-primary" onclick="associarEquipamentoViatura(${e.id})">Confirmar associacao</button>
       </div>
-    </div>
-    <div class="form-actions">
-      ${e.status === 'inativo' ? `<button class="btn-danger" onclick="excluirEquipamentoInativo(${e.id})">Excluir equipamento</button>` : ''}
-      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" onclick="salvarEquipamentoTecnico(${e.id})">Salvar status</button>
+      <span class="text-muted" style="font-size:11px;margin-top:4px;display:block;">
+        Ao confirmar, o status do equipamento mudara para <strong>Em uso</strong> automaticamente.
+      </span>
+    </div>` : e.status === 'em_uso' ? `
+    <div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--color-border);">
+      <p class="text-muted" style="font-size:12px;margin:0;">
+        Equipamento em uso. Para desvincula-lo, crie uma manutencao para ele no kanban acima.
+      </p>
+    </div>` : e.status === 'inativo' ? `
+    <div style="margin-top:12px;padding:10px;background:rgba(231,76,60,0.08);border-radius:8px;border:1px solid var(--color-critica);">
+      <p style="font-size:12px;color:var(--color-critica);margin:0 0 10px 0;">
+        Equipamento inativo. Como tecnico responsavel, voce pode excluir este equipamento permanentemente.
+      </p>
+      <button class="btn-danger" style="width:100%;" onclick="excluirEquipamentoInativo(${e.id})">
+        Excluir equipamento permanentemente
+      </button>
+    </div>` : ''}
+    <div class="form-actions" style="margin-top:16px;">
+      <button class="btn-secondary" onclick="closeModal()">Fechar</button>
     </div>`);
 }
 
@@ -819,19 +853,18 @@ async function excluirEquipamentoInativo(id) {
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-async function salvarEquipamentoTecnico(id) {
-  const dados = { status: document.getElementById('teq-edit-status').value };
-  try {
-    await Equipamentos.atualizar(id, dados); closeModal(); showToast('Status atualizado!', 'success'); await carregarTabelasTecnico();
-  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
-}
-
+// Associar equipamento a viatura: muda status para em_uso automaticamente
 async function associarEquipamentoViatura(equipamentoId) {
   const viaturaId = parseInt(document.getElementById('teq-viatura-select').value);
   if (!viaturaId) { showToast('Selecione uma viatura.', 'error'); return; }
+  if (!confirm('Confirmar associacao deste equipamento a viatura selecionada?')) return;
   try {
     await Viaturas.associarEquipamento(viaturaId, { equipamento_id: equipamentoId, quantidade: 1 });
-    showToast('Equipamento associado!', 'success');
+    // Status muda automaticamente para em_uso
+    await Equipamentos.atualizar(equipamentoId, { status: 'em_uso' });
+    closeModal();
+    showToast('Equipamento associado e marcado como Em uso!', 'success');
+    await carregarTabelasTecnico();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
@@ -842,13 +875,15 @@ async function abrirModalNovaManutencao() {
       <select id="manut-tipo"><option value="preventiva">Preventiva</option><option value="corretiva">Corretiva</option></select>
     </div>
     <div class="form-group"><label>Descricao</label><textarea id="manut-descricao" rows="3" placeholder="Descreva..."></textarea></div>
-    <p class="text-muted" style="font-size:12px;margin:8px 0;">Selecione uma viatura OU um equipamento. Ao menos um e obrigatorio.</p>
-    <div class="form-group"><label>Viatura (disponivel)</label>
+    <p class="text-muted" style="font-size:12px;margin:8px 0;">
+      Selecione uma viatura OU um equipamento. Ao criar, o recurso sera marcado como <strong>Em manutencao</strong> automaticamente.
+    </p>
+    <div class="form-group"><label>Viatura</label>
       <select id="manut-viatura-id">
         <option value="">Nenhuma (selecione equipamento abaixo)</option>
       </select>
     </div>
-    <div class="form-group"><label>Equipamento (disponivel)</label>
+    <div class="form-group"><label>Equipamento</label>
       <select id="manut-equipamento-id">
         <option value="">Nenhum (selecione viatura acima)</option>
       </select>
@@ -861,16 +896,15 @@ async function abrirModalNovaManutencao() {
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn-primary" onclick="criarManutencao()">Criar</button>
     </div>`);
-  // Preenche selects apos o modal renderizar
   setTimeout(preencherSelectsManutencao, 50);
 }
 
 async function preencherDropdownsManutencao() {
   try {
     const [viaturas, equipamentos] = await Promise.all([Viaturas.listar(), Equipamentos.listar()]);
-    // Guarda para usar depois que o modal abrir
-    window._manutViaturas = viaturas.filter((v) => v.status === 'disponivel');
-    window._manutEquipamentos = equipamentos.filter((e) => e.status === 'disponivel');
+    // Qualquer viatura ou equipamento pode entrar em manutencao (exceto os ja em manutencao)
+    window._manutViaturas = viaturas.filter((v) => v.status !== 'em_manutencao');
+    window._manutEquipamentos = equipamentos.filter((e) => e.status !== 'em_manutencao');
   } catch (e) { console.error('Erro ao carregar dados manutencao:', e); }
 }
 
@@ -879,48 +913,12 @@ async function preencherSelectsManutencao() {
   const selE = document.getElementById('manut-equipamento-id');
   if (selV && window._manutViaturas) {
     selV.innerHTML = '<option value="">Nenhuma</option>' +
-      window._manutViaturas.map((v) => `<option value="${v.id}">${v.placa} — ${v.modelo}</option>`).join('');
+      window._manutViaturas.map((v) => `<option value="${v.id}">${v.placa} — ${v.modelo} (${v.status})</option>`).join('');
   }
   if (selE && window._manutEquipamentos) {
     selE.innerHTML = '<option value="">Nenhum</option>' +
-      window._manutEquipamentos.map((e) => `<option value="${e.id}">#${e.id} ${e.nome}</option>`).join('');
+      window._manutEquipamentos.map((e) => `<option value="${e.id}">#${e.id} ${e.nome} (${e.status})</option>`).join('');
   }
-}
-
-async function buscarViaturaParaManutencao() {
-  const placa = document.getElementById('manut-placa').value.trim();
-  if (!placa) { showToast('Informe a placa.', 'error'); return; }
-  try {
-    const viaturas = await Viaturas.listar();
-    const v = viaturas.find((x) => x.placa.toLowerCase() === placa.toLowerCase());
-    if (v) {
-      document.getElementById('manut-viatura-id').value = v.id;
-      document.getElementById('manut-viatura-info').textContent = `Encontrada: ${v.modelo} (ID: ${v.id})`;
-      document.getElementById('manut-viatura-info').style.color = 'var(--color-encerrada)';
-    } else {
-      document.getElementById('manut-viatura-id').value = '';
-      document.getElementById('manut-viatura-info').textContent = 'Viatura nao encontrada';
-      document.getElementById('manut-viatura-info').style.color = 'var(--color-critica)';
-    }
-  } catch (erro) { showToast('Erro ao buscar viatura.', 'error'); }
-}
-
-async function buscarEquipamentoParaManutencao() {
-  const nome = document.getElementById('manut-eq-nome').value.trim();
-  if (!nome) { showToast('Informe o nome.', 'error'); return; }
-  try {
-    const equipamentos = await Equipamentos.listar();
-    const e = equipamentos.find((x) => x.nome.toLowerCase().includes(nome.toLowerCase()));
-    if (e) {
-      document.getElementById('manut-equipamento-id').value = e.id;
-      document.getElementById('manut-eq-info').textContent = `Encontrado: ${e.nome} (ID: ${e.id})`;
-      document.getElementById('manut-eq-info').style.color = 'var(--color-encerrada)';
-    } else {
-      document.getElementById('manut-equipamento-id').value = '';
-      document.getElementById('manut-eq-info').textContent = 'Equipamento nao encontrado';
-      document.getElementById('manut-eq-info').style.color = 'var(--color-critica)';
-    }
-  } catch (erro) { showToast('Erro ao buscar equipamento.', 'error'); }
 }
 
 async function criarManutencao() {
@@ -936,13 +934,22 @@ async function criarManutencao() {
   };
   if (!dados.descricao) { showToast('Informe a descricao.', 'error'); return; }
   try {
-    await Manutencoes.criar(dados); closeModal(); showToast('Manutencao criada!', 'success'); await carregarKanbanManutencoes();
-  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
-}
+    await Manutencoes.criar(dados);
 
-// Helper: agenda recarregamento do kanban após N minutos (para sumir itens concluidos)
-function agendarLimpezaKanban(minutos) {
-  setTimeout(() => { if (document.getElementById('col-manut-concluida')) carregarKanbanManutencoes(); }, minutos * 60 * 1000);
+    // Marca o recurso como em_manutencao automaticamente
+    if (viaturaId) {
+      await Viaturas.atualizar(viaturaId, { status: 'em_manutencao' });
+    }
+    if (equipamentoId) {
+      // Se equipamento estava em_uso, a manutencao o desvincula implicitamente
+      await Equipamentos.atualizar(equipamentoId, { status: 'em_manutencao' });
+    }
+
+    closeModal();
+    showToast('Manutencao criada! Recurso marcado como em manutencao.', 'success');
+    await carregarKanbanManutencoes();
+    await carregarTabelasTecnico();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 // =============================================
@@ -1002,9 +1009,6 @@ async function carregarDenunciasBombeiro() {
   if (!container) return;
   try {
     const todasDenuncias = await Denuncias.listar();
-    // Bombeiro ve: pendente, em_analise e aprovada
-    // Aprovada some apenas quando o bombeiro criar a ocorrencia (recarregamento apos criar)
-    // Arquivada e convertida nao aparecem
     const denuncias = todasDenuncias.filter((d) =>
       ['pendente', 'em_analise', 'aprovada'].includes(d.status)
     );
@@ -1056,13 +1060,19 @@ async function carregarViaturasBombeiro() {
   if (!container) return;
   try {
     const viaturas = await Viaturas.listar();
+    // Bombeiro so ve viaturas disponiveis (nao em manutencao, nao inativas)
     const disponiveis = viaturas.filter((v) => v.status === 'disponivel');
     if (disponiveis.length === 0) {
       container.innerHTML = '<div class="empty-state">Nenhuma viatura disponivel no momento.</div>'; return;
     }
     const viaturaComEquip = await Promise.all(
       disponiveis.map(async (v) => {
-        try { const equips = await Viaturas.listarEquipamentos(v.id); return { ...v, equipamentos: equips }; }
+        try {
+          const equips = await Viaturas.listarEquipamentos(v.id);
+          // Filtra equipamentos em manutencao — bombeiro nao ve
+          const equipsDisponiveis = equips.filter((e) => e.status !== 'em_manutencao');
+          return { ...v, equipamentos: equipsDisponiveis };
+        }
         catch { return { ...v, equipamentos: [] }; }
       })
     );
@@ -1110,7 +1120,6 @@ async function buscarCoordenadas(logradouro, bairro, cidade) {
 }
 
 async function abrirModalRegistrarOcorrencia() {
-  // Carrega denuncias aprovadas para o select
   let denunciasAprovadas = [];
   try {
     const todas = await Denuncias.listar();
@@ -1164,7 +1173,6 @@ async function abrirModalRegistrarOcorrencia() {
     </div>`);
 }
 
-// Coordenadas aproximadas por bairro de Brasilia (fallback)
 const COORDS_BAIRROS_BSB = {
   'asa norte':              { lat: -15.7500, lng: -47.8900 },
   'asa sul':                { lat: -15.8200, lng: -47.8900 },
@@ -1181,7 +1189,6 @@ const COORDS_BAIRROS_BSB = {
   'guara':                  { lat: -15.8100, lng: -47.9800 },
   'cruzeiro':               { lat: -15.7900, lng: -47.9400 },
   'setor hospitalar sul':   { lat: -15.7900, lng: -47.8900 },
-  'setor de divulgacao cultural': { lat: -15.7900, lng: -47.8800 },
   'riacho fundo':           { lat: -15.9000, lng: -48.0300 },
   'recanto das emas':       { lat: -15.9100, lng: -48.0700 },
   'santa maria':            { lat: -16.0000, lng: -48.0000 },
@@ -1190,7 +1197,6 @@ const COORDS_BAIRROS_BSB = {
   'itapoa':                 { lat: -15.6800, lng: -47.7600 },
 };
 
-// Centro de Brasilia como fallback final
 const CENTRO_BSB = { lat: -15.7998, lng: -47.8645 };
 
 async function geocodificarEndereco() {
@@ -1202,23 +1208,12 @@ async function geocodificarEndereco() {
   info.textContent = 'Buscando localizacao...';
   info.style.color = 'var(--color-text-muted)';
 
-  // Tentativa 1: Nominatim com endereco completo
   let coords = await buscarCoordenadas(logradouro, bairro, cidade);
-
-  // Tentativa 2: Nominatim apenas com bairro
-  if (!coords && bairro) {
-    coords = await buscarCoordenadas('', bairro, cidade);
-  }
-
-  // Tentativa 3: Lookup por bairro no dicionario local
+  if (!coords && bairro) coords = await buscarCoordenadas('', bairro, cidade);
   if (!coords && bairro) {
     const chave = bairro.toLowerCase().trim();
-    if (COORDS_BAIRROS_BSB[chave]) {
-      coords = COORDS_BAIRROS_BSB[chave];
-    }
+    if (COORDS_BAIRROS_BSB[chave]) coords = COORDS_BAIRROS_BSB[chave];
   }
-
-  // Tentativa 4: Centro de Brasilia como fallback final
   if (!coords) {
     coords = CENTRO_BSB;
     info.textContent = 'Endereco nao encontrado. Usando centro de Brasilia como localizacao aproximada.';
@@ -1227,7 +1222,6 @@ async function geocodificarEndereco() {
     info.textContent = `Localizacao encontrada: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
     info.style.color = 'var(--color-encerrada)';
   }
-
   document.getElementById('oc-lat').value = coords.lat;
   document.getElementById('oc-lng').value = coords.lng;
 }
@@ -1252,15 +1246,11 @@ async function registrarOcorrenciaBombeiro() {
   if (!dados.descricao) { showToast('Informe a descricao.', 'error'); return; }
   try {
     await Ocorrencias.criar(dados);
-
-    // FIX 2: marcar denuncia como convertida apos criar ocorrencia
     const denunciaId = parseInt(document.getElementById('oc-denuncia-id')?.value) || null;
     if (denunciaId) {
-      try {
-        await Denuncias.atualizar(denunciaId, { status: 'convertida' });
-      } catch (e) { console.error('Erro ao converter denuncia:', e); }
+      try { await Denuncias.atualizar(denunciaId, { status: 'convertida' }); }
+      catch (e) { console.error('Erro ao converter denuncia:', e); }
     }
-
     closeModal();
     showToast('Ocorrencia registrada! Aparece no Kanban do Comandante.', 'success');
     await carregarTabelaOcorrenciasBombeiro();
@@ -1269,9 +1259,7 @@ async function registrarOcorrenciaBombeiro() {
       mapaOcorrencias.eachLayer((l) => { if (l instanceof L.Marker) mapaOcorrencias.removeLayer(l); });
       await carregarPinsOcorrencias();
     }
-    if (document.getElementById('col-aberta')) {
-      await carregarKanbanOcorrencias();
-    }
+    if (document.getElementById('col-aberta')) await carregarKanbanOcorrencias();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
@@ -1317,22 +1305,15 @@ async function abrirModalAtualizarStatusOcorrencia(oc) {
       <button class="btn-primary" onclick="atualizarStatusOcorrencia(${oc.id})">Salvar</button>
     </div>`);
 
-  // FIX 2: Preencher dropdowns excluindo já alocados nesta ocorrencia
   try {
-    // Buscar todas ocorrencias ativas para saber quais bombeiros ja estao alocados
     const [bombeiros, viaturas, bombeiroAlocados, viaturaAlocadas, todasOcorrencias] = await Promise.all([
-      Bombeiros.listar(),
-      Viaturas.listar(),
+      Bombeiros.listar(), Viaturas.listar(),
       Ocorrencias.listarBombeiros(oc.id).catch(() => []),
       Ocorrencias.listarViaturas(oc.id).catch(() => []),
       Ocorrencias.listar(),
     ]);
-
-    // IDs de bombeiros alocados nesta ocorrencia
     const idsAlocadosNesta = bombeiroAlocados.map((b) => b.bombeiro_id);
     const idsViaturasAlocadas = viaturaAlocadas.map((v) => v.viatura_id);
-
-    // IDs de bombeiros alocados em OUTRAS ocorrencias abertas ou em_andamento
     const outrasOcorrencias = todasOcorrencias.filter((o) =>
       o.id !== oc.id && ['aberta','em_andamento'].includes(o.status)
     );
@@ -1343,17 +1324,12 @@ async function abrirModalAtualizarStatusOcorrencia(oc) {
         alocados.forEach((a) => idsEmOutrasOcorrencias.push(a.bombeiro_id));
       } catch (e) {}
     }
-
-    // Bombeiro disponivel = ativo + nao alocado nesta + nao alocado em outra ocorrencia ativa
     const bombeirosFiltrados = bombeiros.filter((b) =>
-      b.status === 'ativo' &&
-      !idsAlocadosNesta.includes(b.id) &&
-      !idsEmOutrasOcorrencias.includes(b.id)
+      b.status === 'ativo' && !idsAlocadosNesta.includes(b.id) && !idsEmOutrasOcorrencias.includes(b.id)
     );
     const viaturasFiltradas = viaturas.filter((v) =>
       v.status === 'disponivel' && !idsViaturasAlocadas.includes(v.id)
     );
-
     const selB = document.getElementById('oc-bombeiro-select');
     if (selB) {
       selB.innerHTML = `<option value="">+ Adicionar bombeiro (${bombeirosFiltrados.length} disp.)...</option>` +
@@ -1368,30 +1344,19 @@ async function abrirModalAtualizarStatusOcorrencia(oc) {
 }
 
 async function solicitarEncerramentoOcorrencia(id) {
-  // Validacao: precisa de >= 2 bombeiros e >= 1 viatura para solicitar encerramento
   try {
     const [bombeiros, viaturas] = await Promise.all([
       Ocorrencias.listarBombeiros(id).catch(() => []),
       Ocorrencias.listarViaturas(id).catch(() => []),
     ]);
-    if (bombeiros.length < 2) {
-      showToast('Necessario ao menos 2 bombeiros alocados para solicitar encerramento.', 'error');
-      return;
-    }
-    if (viaturas.length < 1) {
-      showToast('Necessario ao menos 1 viatura alocada para solicitar encerramento.', 'error');
-      return;
-    }
-  } catch (e) {
-    showToast('Erro ao verificar alocacoes.', 'error'); return;
-  }
-
+    if (bombeiros.length < 2) { showToast('Necessario ao menos 2 bombeiros alocados para solicitar encerramento.', 'error'); return; }
+    if (viaturas.length < 1) { showToast('Necessario ao menos 1 viatura alocada para solicitar encerramento.', 'error'); return; }
+  } catch (e) { showToast('Erro ao verificar alocacoes.', 'error'); return; }
   const motivo = document.getElementById('oc-motivo-encerramento').value || 'Bombeiro solicita encerramento.';
   try {
     await Ocorrencias.atualizar(id, { descricao: `[SOLICITACAO DE ENCERRAMENTO] ${motivo}` });
     showToast('Solicitacao de encerramento enviada ao Comandante!', 'success');
-    closeModal();
-    await carregarTabelaOcorrenciasBombeiro();
+    closeModal(); await carregarTabelaOcorrenciasBombeiro();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
@@ -1415,25 +1380,20 @@ async function vincularBombeiroOcorrencia(ocorrenciaId) {
   try {
     await Ocorrencias.alocarBombeiro(ocorrenciaId, { bombeiro_id: bombeiroId });
     showToast(`${nomeSelecionado} vinculado!`, 'success');
-    // Remove imediatamente do select sem recarregar a pagina
     sel.remove(sel.selectedIndex);
     sel.value = '';
-    // Atualiza contador no select
     const disponiveis = sel.options.length - 1;
     sel.options[0].text = `+ Adicionar bombeiro (${disponiveis} disp.)...`;
-    // Adiciona badge do bombeiro alocado na lista
     const listaBombeiros = document.querySelector('.lista-bombeiros-alocados');
     if (listaBombeiros) {
       const badge = document.createElement('span');
       badge.className = 'badge badge-info';
       badge.style.margin = '2px';
       badge.textContent = nomeSelecionado;
-      // Remove mensagem "nenhum alocado" se existir
       const vazio = listaBombeiros.querySelector('.text-muted');
       if (vazio) vazio.remove();
       listaBombeiros.appendChild(badge);
     }
-    // Atualiza contador minimo
     const contadorB = document.getElementById('contador-bombeiros');
     if (contadorB) {
       const atual = parseInt(contadorB.dataset.count || '0') + 1;
@@ -1452,7 +1412,6 @@ async function adicionarViaturaOcorrencia(ocorrenciaId) {
   try {
     await Ocorrencias.alocarViatura(ocorrenciaId, { viatura_id: viaturaId });
     showToast(`Viatura ${placaSelecionada} adicionada!`, 'success');
-    // Recarrega modal para refletir nova alocacao
     const ocorrencias = await Ocorrencias.listar();
     const oc = ocorrencias.find((x) => x.id === ocorrenciaId);
     if (oc) await abrirModalAtualizarStatusOcorrencia(oc);
@@ -1529,7 +1488,6 @@ async function carregarOcorrenciasCidadao() {
   if (!container) return;
   try {
     const todas = await Ocorrencias.listar();
-    // FIX 6: cidadao nao ve ocorrencias encerradas
     const ocorrencias = todas.filter((oc) => oc.status !== 'encerrada');
     const tabela = criarTabela(
       [

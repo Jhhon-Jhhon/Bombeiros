@@ -128,22 +128,23 @@ def seed_viaturas(db):
             modelo="Scania P360 AutoBomba",
             tipo=TipoViatura.auto_bomba,
             ano_fabricacao=2019,
-            status=StatusViatura.disponivel,
+            status=StatusViatura.disponivel,   # disponivel — sem manutenção ativa
         ),
         Viatura(
             placa="DF-002-AB",
             modelo="Mercedes-Benz Atron AutoEscada",
             tipo=TipoViatura.auto_escada,
             ano_fabricacao=2021,
-            status=StatusViatura.disponivel,
+            status=StatusViatura.disponivel,   # disponivel
         ),
         Viatura(
             placa="DF-003-AB",
             modelo="Mercedes-Benz Sprinter UTI",
             tipo=TipoViatura.ambulancia,
             ano_fabricacao=2022,
-            status=StatusViatura.disponivel,
+            status=StatusViatura.disponivel,   # disponivel
         ),
+        # DF-004-AB: em_manutencao — terá manutenção pendente vinculada abaixo
         Viatura(
             placa="DF-004-AB",
             modelo="Toyota Hilux Veículo Leve",
@@ -162,35 +163,40 @@ def seed_viaturas(db):
 def seed_equipamentos(db):
     print("🧰 Inserindo equipamentos...")
     equipamentos = [
+        # Equipamento 0: disponivel — será associado a DF-001-AB abaixo
         Equipamento(
             nome="Mangueira de Ataque 40mm",
             tipo=TipoEquipamento.combate,
             numero_serie="MNG-40-001",
             status=StatusEquipamento.disponivel,
         ),
+        # Equipamento 1: disponivel
         Equipamento(
             nome="Escada Extensível 9m",
             tipo=TipoEquipamento.resgate,
             numero_serie="ESC-9M-001",
             status=StatusEquipamento.disponivel,
         ),
+        # Equipamento 2: disponivel
         Equipamento(
             nome="Desfibrilador DEA",
             tipo=TipoEquipamento.medico,
             numero_serie="DEA-001-DF",
             status=StatusEquipamento.disponivel,
         ),
+        # Equipamento 3: em_uso — vinculado a DF-001-AB via viatura_equipamento abaixo
         Equipamento(
             nome="Aparelho de Respiração Autônoma",
             tipo=TipoEquipamento.combate,
             numero_serie="ARA-001-DF",
             status=StatusEquipamento.em_uso,
         ),
+        # Equipamento 4: em_manutencao — terá manutenção em_andamento vinculada abaixo
         Equipamento(
             nome="Kit Ferramentas de Corte Hidráulico",
             tipo=TipoEquipamento.resgate,
             numero_serie="KIT-HC-001",
-            status=StatusEquipamento.disponivel,
+            status=StatusEquipamento.em_manutencao,
         ),
     ]
     for e in equipamentos:
@@ -200,10 +206,66 @@ def seed_equipamentos(db):
     return equipamentos
 
 
+def seed_viatura_equipamento(db, viaturas, equipamentos):
+    """Associa equipamento em_uso à viatura correta via viatura_equipamento."""
+    print("🔗 Vinculando equipamentos às viaturas...")
+    from sqlalchemy import text
+    # Aparelho de Respiração Autônoma (equipamentos[3]) → DF-001-AB (viaturas[0])
+    db.execute(text("""
+        INSERT INTO viatura_equipamento (viatura_id, equipamento_id, quantidade)
+        VALUES (:vid, :eid, 1)
+    """), {"vid": viaturas[0].id, "eid": equipamentos[3].id})
+    db.commit()
+    print("  ✅ Aparelho de Respiração Autônoma vinculado à DF-001-AB")
+
+
+def seed_manutencoes(db, viaturas, equipamentos):
+    print("🔧 Inserindo manutenções...")
+    manutencoes = [
+        # DF-004-AB está em_manutencao → manutenção PENDENTE (aguardando técnico preencher data de início)
+        # Fluxo: Comandante solicitou → criou com status pendente → técnico ainda não iniciou
+        Manutencao(
+            tipo=TipoManutencao.preventiva,
+            descricao="Revisão geral — troca de óleo, filtros e freios",
+            status=StatusManutencao.pendente,
+            data_inicio=date(2026, 6, 26),  # data da solicitação (banco NOT NULL)
+            viatura_id=viaturas[3].id,      # DF-004-AB
+        ),
+
+        # Kit Ferramentas (equipamentos[4]) está em_manutencao → manutenção EM ANDAMENTO
+        # Fluxo: técnico já preencheu data_inicio e data_fim ao avançar de pendente → em_andamento
+        Manutencao(
+            tipo=TipoManutencao.corretiva,
+            descricao="Substituição de mangueira hidráulica danificada",
+            custo=Decimal("380.00"),
+            data_inicio=date(2026, 6, 20),
+            data_fim=date(2026, 6, 30),   # data_fim obrigatória para estar em_andamento
+            status=StatusManutencao.em_andamento,
+            equipamento_id=equipamentos[4].id,  # Kit Ferramentas
+        ),
+
+        # Manutenção histórica já concluída (viatura que agora está disponivel)
+        # Não altera status de nenhuma viatura/equipamento atual
+        Manutencao(
+            tipo=TipoManutencao.preventiva,
+            descricao="Revisão anual de rotina — certificação renovada",
+            custo=Decimal("1250.00"),
+            data_inicio=date(2026, 5, 10),
+            data_fim=date(2026, 5, 12),
+            status=StatusManutencao.concluida,
+            viatura_id=viaturas[1].id,   # DF-002-AB — agora disponivel (manutenção já encerrada)
+        ),
+    ]
+    for m in manutencoes:
+        db.add(m)
+    db.commit()
+    print(f"  ✅ {len(manutencoes)} manutenções inseridas")
+
+
 def seed_ocorrencias(db, viaturas, bombeiros):
     print("🚨 Inserindo ocorrências...")
 
-    # Aberta — incêndio crítico, sem data de encerramento
+    # Aberta — incêndio crítico
     oc1 = Ocorrencia(
         tipo=TipoOcorrencia.incendio,
         descricao="Incêndio em transformador elétrico na Torre de TV",
@@ -225,7 +287,7 @@ def seed_ocorrencias(db, viaturas, bombeiros):
         longitude=-47.9292,
     ))
 
-    # Em andamento — acidente com vítimas, sem data de encerramento
+    # Em andamento — acidente com vítimas
     oc2 = Ocorrencia(
         tipo=TipoOcorrencia.acidente,
         descricao="Colisão entre ônibus e automóvel com vítimas presas",
@@ -247,7 +309,7 @@ def seed_ocorrencias(db, viaturas, bombeiros):
         longitude=-47.8982,
     ))
 
-    # Aberta — resgate aquático, sem data de encerramento
+    # Aberta — resgate aquático
     oc3 = Ocorrencia(
         tipo=TipoOcorrencia.resgate,
         descricao="Pessoa desaparecida no Lago Norte após acidente náutico",
@@ -269,7 +331,7 @@ def seed_ocorrencias(db, viaturas, bombeiros):
         longitude=-47.8824,
     ))
 
-    # Encerrada — inundação, COM data_encerramento (duração: ~4h30)
+    # Encerrada — inundação
     oc4 = Ocorrencia(
         tipo=TipoOcorrencia.inundacao,
         descricao="Alagamento em via após chuvas intensas",
@@ -292,7 +354,7 @@ def seed_ocorrencias(db, viaturas, bombeiros):
         longitude=-48.1101,
     ))
 
-    # Encerrada — incêndio crítico, COM data_encerramento (duração: ~4h)
+    # Encerrada — incêndio crítico
     oc5 = Ocorrencia(
         tipo=TipoOcorrencia.incendio,
         descricao="Incêndio em estabelecimento comercial no centro de Taguatinga",
@@ -318,33 +380,6 @@ def seed_ocorrencias(db, viaturas, bombeiros):
     db.commit()
     print("  ✅ 5 ocorrências inseridas")
     return [oc1, oc2, oc3, oc4, oc5]
-
-
-def seed_manutencoes(db, viaturas, equipamentos):
-    print("🔧 Inserindo manutenções...")
-    manutencoes = [
-        Manutencao(
-            tipo=TipoManutencao.preventiva,
-            descricao="Revisão geral — troca de óleo e filtros",
-            custo=Decimal("1250.00"),
-            data_inicio=date(2026, 5, 20),
-            data_fim=date(2026, 5, 22),
-            status=StatusManutencao.concluida,
-            viatura_id=viaturas[3].id,
-        ),
-        Manutencao(
-            tipo=TipoManutencao.corretiva,
-            descricao="Substituição de mangueira danificada",
-            custo=Decimal("380.00"),
-            data_inicio=date(2026, 6, 1),
-            status=StatusManutencao.em_andamento,
-            equipamento_id=equipamentos[0].id,
-        ),
-    ]
-    for m in manutencoes:
-        db.add(m)
-    db.commit()
-    print(f"  ✅ {len(manutencoes)} manutenções inseridas")
 
 
 def seed_treinamentos(db, bombeiros):
@@ -406,11 +441,12 @@ def main():
     db = SessionLocal()
     try:
         limpar_banco(db)
-        bombeiros = seed_bombeiros(db)
-        viaturas = seed_viaturas(db)
+        bombeiros  = seed_bombeiros(db)
+        viaturas   = seed_viaturas(db)
         equipamentos = seed_equipamentos(db)
-        seed_ocorrencias(db, viaturas, bombeiros)
+        seed_viatura_equipamento(db, viaturas, equipamentos)
         seed_manutencoes(db, viaturas, equipamentos)
+        seed_ocorrencias(db, viaturas, bombeiros)
         seed_treinamentos(db, bombeiros)
         seed_denuncias(db)
         print("\n✅ Seed concluído com sucesso!")

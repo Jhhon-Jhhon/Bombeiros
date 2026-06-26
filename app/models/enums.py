@@ -13,6 +13,9 @@ class PatenteBombeiro(enum.Enum):
     sargento = "sargento"
     tenente = "tenente"
     capitao = "capitao"
+    major = "major"
+    tenente_coronel = "tenente_coronel"
+    coronel = "coronel"
 
 
 class StatusEquipe(enum.Enum):
@@ -59,6 +62,7 @@ class StatusEquipamento(enum.Enum):
     disponivel = "disponivel"
     em_uso = "em_uso"
     em_manutencao = "em_manutencao"
+    inativo = "inativo"          # adicionado: equipamento fora de operação
 
 
 class TipoEquipamento(enum.Enum):
@@ -66,6 +70,7 @@ class TipoEquipamento(enum.Enum):
     resgate = "resgate"
     medico = "medico"
     comunicacao = "comunicacao"
+    outros = "outros"
 
 
 class TipoManutencao(enum.Enum):
@@ -105,6 +110,7 @@ class StatusDenuncia(enum.Enum):
     aprovada = "aprovada"
     arquivada = "arquivada"
     convertida = "convertida"
+
 
 class StatusSolicitacao(enum.Enum):
     recebida = "recebida"
