@@ -9,6 +9,7 @@ from app.crud.ocorrencia import (
     alocar_viatura,
     create_ocorrencia,
     delete_ocorrencia,
+    get_bombeiros_da_ocorrencia,
     get_ocorrencia,
     get_ocorrencias,
     get_viaturas_da_ocorrencia,
@@ -83,10 +84,7 @@ def remover_ocorrencia(ocorrencia_id: int, db: Session = Depends(get_db)):
         )
 
 
-# ═══════════════════════════════════════════════════════════════
-# REGRA DE NEGÓCIO OBRIGATÓRIA — Alocação de viatura
-# Validação em dois níveis: aplicação (409) + banco (trigger)
-# ═══════════════════════════════════════════════════════════════
+# ── Viaturas ──────────────────────────────────────────────────────────────────
 
 @router.post(
     "/{ocorrencia_id}/viaturas",
@@ -98,30 +96,18 @@ def alocar_viatura_ocorrencia(
     dados: AlocarViaturaRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Aloca uma viatura a uma ocorrência.
-
-    REGRA DE NEGÓCIO (RN01): viatura com status 'em_atendimento'
-    não pode ser alocada. Retorna 409 se já estiver em uso.
-    """
-    # Verifica se a ocorrência existe
-    ocorrencia = get_ocorrencia(db, ocorrencia_id)
-    if not ocorrencia:
+    """Aloca uma viatura a uma ocorrência. RN01: viatura em_atendimento não pode ser alocada."""
+    if not get_ocorrencia(db, ocorrencia_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ocorrência id={ocorrencia_id} não encontrada",
         )
-
-    # Verifica se a viatura existe
     viatura = get_viatura(db, dados.viatura_id)
     if not viatura:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Viatura id={dados.viatura_id} não encontrada",
         )
-
-    # ── REGRA DE NEGÓCIO — Nível 1: aplicação ──────────────────
-    # Verifica se a viatura já está em atendimento
     if viatura_esta_em_atendimento(db, dados.viatura_id):
         logger.warning(
             "Tentativa de alocar viatura id=%s em atendimento à ocorrência id=%s",
@@ -134,8 +120,6 @@ def alocar_viatura_ocorrencia(
                 "ser alocada a uma nova ocorrência até que a atual seja encerrada."
             ),
         )
-    # ── Nível 2: trigger no PostgreSQL (implementado no Passo 4) ──
-
     return alocar_viatura(db, ocorrencia_id, dados)
 
 
@@ -154,6 +138,8 @@ def listar_viaturas_ocorrencia(
         )
     return get_viaturas_da_ocorrencia(db, ocorrencia_id)
 
+
+# ── Bombeiros ─────────────────────────────────────────────────────────────────
 
 @router.post(
     "/{ocorrencia_id}/bombeiros",
@@ -177,3 +163,19 @@ def alocar_bombeiro_ocorrencia(
             detail=f"Bombeiro id={dados.bombeiro_id} não encontrado",
         )
     return alocar_bombeiro(db, ocorrencia_id, dados)
+
+
+@router.get(
+    "/{ocorrencia_id}/bombeiros",
+    response_model=list[OcorrenciaBombeiroResponse],
+)
+def listar_bombeiros_ocorrencia(
+    ocorrencia_id: int, db: Session = Depends(get_db)
+):
+    """Lista todos os bombeiros alocados a uma ocorrência."""
+    if not get_ocorrencia(db, ocorrencia_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ocorrência id={ocorrencia_id} não encontrada",
+        )
+    return get_bombeiros_da_ocorrencia(db, ocorrencia_id)

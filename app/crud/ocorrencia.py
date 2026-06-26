@@ -38,15 +38,13 @@ def get_ocorrencias(
 
 def create_ocorrencia(db: Session, dados: OcorrenciaCreate) -> Ocorrencia:
     """Cria a ocorrência e o endereço numa única transação."""
-    # Separa os dados do endereço dos dados da ocorrência
     endereco_dados = dados.endereco
     ocorrencia_dados = dados.model_dump(exclude={"endereco"})
 
     ocorrencia = Ocorrencia(**ocorrencia_dados)
     db.add(ocorrencia)
-    db.flush()  # gera o id da ocorrência sem commitar ainda
+    db.flush()
 
-    # Cria o endereço vinculado à ocorrência recém-criada
     endereco = EnderecoOcorrencia(
         **endereco_dados.model_dump(),
         ocorrencia_id=ocorrencia.id,
@@ -68,7 +66,6 @@ def update_ocorrencia(
 
     campos = dados.model_dump(exclude_unset=True)
 
-    # Se está encerrando, registra o timestamp
     if campos.get("status") == StatusOcorrencia.encerrada:
         campos["data_encerramento"] = datetime.now(timezone.utc)
 
@@ -94,7 +91,6 @@ def delete_ocorrencia(db: Session, ocorrencia_id: int) -> bool:
 # ── Alocação de Viatura ───────────────────────────────────────────────────────
 
 def viatura_esta_em_atendimento(db: Session, viatura_id: int) -> bool:
-    """Verifica se a viatura já está alocada a uma ocorrência ativa."""
     viatura = db.query(Viatura).filter(Viatura.id == viatura_id).first()
     if not viatura:
         return False
@@ -112,10 +108,7 @@ def alocar_viatura(
     db.add(alocacao)
     db.commit()
     db.refresh(alocacao)
-    logger.info(
-        "Viatura id=%s alocada à ocorrência id=%s",
-        dados.viatura_id, ocorrencia_id
-    )
+    logger.info("Viatura id=%s alocada à ocorrência id=%s", dados.viatura_id, ocorrencia_id)
     return alocacao
 
 
@@ -142,8 +135,15 @@ def alocar_bombeiro(
     db.add(alocacao)
     db.commit()
     db.refresh(alocacao)
-    logger.info(
-        "Bombeiro id=%s alocado à ocorrência id=%s",
-        dados.bombeiro_id, ocorrencia_id
-    )
+    logger.info("Bombeiro id=%s alocado à ocorrência id=%s", dados.bombeiro_id, ocorrencia_id)
     return alocacao
+
+
+def get_bombeiros_da_ocorrencia(
+    db: Session, ocorrencia_id: int
+) -> list[OcorrenciaBombeiro]:
+    return (
+        db.query(OcorrenciaBombeiro)
+        .filter(OcorrenciaBombeiro.ocorrencia_id == ocorrencia_id)
+        .all()
+    )

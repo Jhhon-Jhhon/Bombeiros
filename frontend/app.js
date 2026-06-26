@@ -394,7 +394,7 @@ async function abrirModalMembros(equipeId, equipeNome) {
   openModal(`Membros - ${equipeNome}`, '<div class="empty-state">Carregando...</div>');
   try {
     const [membros, bombeiros] = await Promise.all([
-      request('GET', `/equipes/${equipeId}/bombeiros`), Bombeiros.listar(),
+      Equipes.listarBombeiros(equipeId), Bombeiros.listar(),
     ]);
     const idsAlocados = membros.map((m) => m.bombeiro_id);
     const disponiveis = bombeiros.filter((b) => !idsAlocados.includes(b.id));
@@ -432,7 +432,7 @@ async function adicionarMembroEquipe(equipeId, equipeNome) {
   const funcao = document.getElementById('funcao-membro').value || null;
   if (!bombeiroId) { showToast('Selecione um bombeiro.', 'error'); return; }
   try {
-    await request('POST', `/equipes/${equipeId}/bombeiros`, { bombeiro_id: bombeiroId, funcao });
+    await Equipes.adicionarBombeiro(equipeId, { bombeiro_id: bombeiroId, funcao });
     showToast('Bombeiro adicionado!', 'success'); await abrirModalMembros(equipeId, equipeNome);
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
@@ -440,7 +440,7 @@ async function adicionarMembroEquipe(equipeId, equipeNome) {
 async function removerMembroEquipe(equipeId, bombeiroId, equipeNome) {
   if (!confirm('Remover este bombeiro da equipe?')) return;
   try {
-    await request('DELETE', `/equipes/${equipeId}/bombeiros/${bombeiroId}`);
+    await Equipes.removerBombeiro(equipeId, bombeiroId);
     showToast('Membro removido.', 'info'); await abrirModalMembros(equipeId, equipeNome);
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
@@ -482,7 +482,7 @@ async function abrirModalComandanteTreinamento(t) {
   openModal(`Treinamento - ${t.titulo}`, '<div class="empty-state">Carregando participantes...</div>');
   try {
     const [participantes, bombeiros] = await Promise.all([
-      request('GET', `/treinamentos/${t.id}/bombeiros`), Bombeiros.listar(),
+      Treinamentos.listarInscritos(t.id), Bombeiros.listar(),
     ]);
     const listaParticipantes = participantes.length > 0
       ? participantes.map((p) => {
@@ -542,7 +542,7 @@ async function abrirModalComandanteTreinamento(t) {
 
 async function atualizarParticipacao(treinamentoId, bombeiroId, novoStatus) {
   try {
-    await request('PUT', `/treinamentos/${treinamentoId}/bombeiros/${bombeiroId}`, { status_participacao: novoStatus });
+    await Treinamentos.atualizarInscricao(treinamentoId, bombeiroId, { status_participacao: novoStatus });
     showToast('Participacao atualizada!', 'success');
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
@@ -830,33 +830,28 @@ async function associarEquipamentoViatura(equipamentoId) {
   const viaturaId = parseInt(document.getElementById('teq-viatura-select').value);
   if (!viaturaId) { showToast('Selecione uma viatura.', 'error'); return; }
   try {
-    await request('POST', `/viaturas/${viaturaId}/equipamentos`, { equipamento_id: equipamentoId, quantidade: 1 });
+    await Viaturas.associarEquipamento(viaturaId, { equipamento_id: equipamentoId, quantidade: 1 });
     showToast('Equipamento associado!', 'success');
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-function abrirModalNovaManutencao() {
+async function abrirModalNovaManutencao() {
+  await preencherDropdownsManutencao();
   openModal('Nova manutencao', `
     <div class="form-group"><label>Tipo</label>
       <select id="manut-tipo"><option value="preventiva">Preventiva</option><option value="corretiva">Corretiva</option></select>
     </div>
     <div class="form-group"><label>Descricao</label><textarea id="manut-descricao" rows="3" placeholder="Descreva..."></textarea></div>
-    <p class="text-muted" style="font-size:12px;margin:8px 0;">Busque viatura pela placa OU equipamento pelo nome. Ao menos um e obrigatorio.</p>
-    <div class="form-group"><label>Placa da viatura</label>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="manut-placa" placeholder="Ex: DF-001-AB" style="flex:1" />
-        <button class="btn-secondary" onclick="buscarViaturaParaManutencao()">Buscar</button>
-      </div>
-      <span id="manut-viatura-info" class="text-muted" style="font-size:12px;"></span>
-      <input type="hidden" id="manut-viatura-id" />
+    <p class="text-muted" style="font-size:12px;margin:8px 0;">Selecione uma viatura OU um equipamento. Ao menos um e obrigatorio.</p>
+    <div class="form-group"><label>Viatura (disponivel)</label>
+      <select id="manut-viatura-id">
+        <option value="">Nenhuma (selecione equipamento abaixo)</option>
+      </select>
     </div>
-    <div class="form-group"><label>Nome do equipamento</label>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="manut-eq-nome" placeholder="Ex: Mangueira de Ataque" style="flex:1" />
-        <button class="btn-secondary" onclick="buscarEquipamentoParaManutencao()">Buscar</button>
-      </div>
-      <span id="manut-eq-info" class="text-muted" style="font-size:12px;"></span>
-      <input type="hidden" id="manut-equipamento-id" />
+    <div class="form-group"><label>Equipamento (disponivel)</label>
+      <select id="manut-equipamento-id">
+        <option value="">Nenhum (selecione viatura acima)</option>
+      </select>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Data de inicio</label><input type="date" id="manut-inicio" /></div>
@@ -866,6 +861,30 @@ function abrirModalNovaManutencao() {
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn-primary" onclick="criarManutencao()">Criar</button>
     </div>`);
+  // Preenche selects apos o modal renderizar
+  setTimeout(preencherSelectsManutencao, 50);
+}
+
+async function preencherDropdownsManutencao() {
+  try {
+    const [viaturas, equipamentos] = await Promise.all([Viaturas.listar(), Equipamentos.listar()]);
+    // Guarda para usar depois que o modal abrir
+    window._manutViaturas = viaturas.filter((v) => v.status === 'disponivel');
+    window._manutEquipamentos = equipamentos.filter((e) => e.status === 'disponivel');
+  } catch (e) { console.error('Erro ao carregar dados manutencao:', e); }
+}
+
+async function preencherSelectsManutencao() {
+  const selV = document.getElementById('manut-viatura-id');
+  const selE = document.getElementById('manut-equipamento-id');
+  if (selV && window._manutViaturas) {
+    selV.innerHTML = '<option value="">Nenhuma</option>' +
+      window._manutViaturas.map((v) => `<option value="${v.id}">${v.placa} — ${v.modelo}</option>`).join('');
+  }
+  if (selE && window._manutEquipamentos) {
+    selE.innerHTML = '<option value="">Nenhum</option>' +
+      window._manutEquipamentos.map((e) => `<option value="${e.id}">#${e.id} ${e.nome}</option>`).join('');
+  }
 }
 
 async function buscarViaturaParaManutencao() {
@@ -905,9 +924,9 @@ async function buscarEquipamentoParaManutencao() {
 }
 
 async function criarManutencao() {
-  const viaturaId = parseInt(document.getElementById('manut-viatura-id').value) || null;
-  const equipamentoId = parseInt(document.getElementById('manut-equipamento-id').value) || null;
-  if (!viaturaId && !equipamentoId) { showToast('Busque uma viatura ou equipamento antes de criar.', 'error'); return; }
+  const viaturaId = parseInt(document.getElementById('manut-viatura-id')?.value) || null;
+  const equipamentoId = parseInt(document.getElementById('manut-equipamento-id')?.value) || null;
+  if (!viaturaId && !equipamentoId) { showToast('Selecione uma viatura ou equipamento.', 'error'); return; }
   const dados = {
     tipo: document.getElementById('manut-tipo').value,
     descricao: document.getElementById('manut-descricao').value,
@@ -983,8 +1002,12 @@ async function carregarDenunciasBombeiro() {
   if (!container) return;
   try {
     const todasDenuncias = await Denuncias.listar();
-    // Bombeiro ve apenas pendentes e em_analise
-    const denuncias = todasDenuncias.filter((d) => ['pendente','em_analise'].includes(d.status));
+    // Bombeiro ve: pendente, em_analise e aprovada
+    // Aprovada some apenas quando o bombeiro criar a ocorrencia (recarregamento apos criar)
+    // Arquivada e convertida nao aparecem
+    const denuncias = todasDenuncias.filter((d) =>
+      ['pendente', 'em_analise', 'aprovada'].includes(d.status)
+    );
     const tabela = criarTabela(
       [
         { label:'Solicitante',key:'solicitante' }, { label:'Tipo',key:'tipo' },
@@ -1039,7 +1062,7 @@ async function carregarViaturasBombeiro() {
     }
     const viaturaComEquip = await Promise.all(
       disponiveis.map(async (v) => {
-        try { const equips = await request('GET', `/viaturas/${v.id}/equipamentos`); return { ...v, equipamentos: equips }; }
+        try { const equips = await Viaturas.listarEquipamentos(v.id); return { ...v, equipamentos: equips }; }
         catch { return { ...v, equipamentos: [] }; }
       })
     );
@@ -1086,8 +1109,31 @@ async function buscarCoordenadas(logradouro, bairro, cidade) {
   return null;
 }
 
-function abrirModalRegistrarOcorrencia() {
+async function abrirModalRegistrarOcorrencia() {
+  // Carrega denuncias aprovadas para o select
+  let denunciasAprovadas = [];
+  try {
+    const todas = await Denuncias.listar();
+    denunciasAprovadas = todas.filter((d) => d.status === 'aprovada');
+  } catch (e) {}
+
+  const opcoesDenuncias = denunciasAprovadas.length > 0
+    ? denunciasAprovadas.map((d) =>
+        `<option value="${d.id}">${d.solicitante} — ${d.tipo} — ${d.endereco_informado??''}</option>`
+      ).join('')
+    : '<option disabled>Nenhuma denuncia aprovada</option>';
+
   openModal('Registrar ocorrencia', `
+    <div class="form-group">
+      <label>Denuncia base (obrigatoria)</label>
+      <select id="oc-denuncia-id" style="border:1px solid var(--color-alta);">
+        <option value="">Selecione a denuncia aprovada...</option>
+        ${opcoesDenuncias}
+      </select>
+      <span class="text-muted" style="font-size:11px;">
+        Ao registrar, a denuncia sera marcada como convertida e sumira desta lista.
+      </span>
+    </div>
     <div class="form-group"><label>Tipo</label>
       <select id="oc-tipo">
         <option value="incendio">Incendio</option><option value="acidente">Acidente</option>
@@ -1118,6 +1164,35 @@ function abrirModalRegistrarOcorrencia() {
     </div>`);
 }
 
+// Coordenadas aproximadas por bairro de Brasilia (fallback)
+const COORDS_BAIRROS_BSB = {
+  'asa norte':              { lat: -15.7500, lng: -47.8900 },
+  'asa sul':                { lat: -15.8200, lng: -47.8900 },
+  'lago norte':             { lat: -15.7300, lng: -47.8400 },
+  'lago sul':               { lat: -15.8600, lng: -47.8700 },
+  'taguatinga':             { lat: -15.8300, lng: -48.0500 },
+  'taguatinga centro':      { lat: -15.8300, lng: -48.0500 },
+  'ceilandia':              { lat: -15.8100, lng: -48.1100 },
+  'ceilandia norte':        { lat: -15.7900, lng: -48.1000 },
+  'sobradinho':             { lat: -15.6500, lng: -47.7900 },
+  'planaltina':             { lat: -15.6200, lng: -47.6500 },
+  'gama':                   { lat: -16.0100, lng: -48.0600 },
+  'samambaia':              { lat: -15.8700, lng: -48.0900 },
+  'guara':                  { lat: -15.8100, lng: -47.9800 },
+  'cruzeiro':               { lat: -15.7900, lng: -47.9400 },
+  'setor hospitalar sul':   { lat: -15.7900, lng: -47.8900 },
+  'setor de divulgacao cultural': { lat: -15.7900, lng: -47.8800 },
+  'riacho fundo':           { lat: -15.9000, lng: -48.0300 },
+  'recanto das emas':       { lat: -15.9100, lng: -48.0700 },
+  'santa maria':            { lat: -16.0000, lng: -48.0000 },
+  'sao sebastiao':          { lat: -15.9000, lng: -47.8000 },
+  'paranoa':                { lat: -15.7700, lng: -47.7700 },
+  'itapoa':                 { lat: -15.6800, lng: -47.7600 },
+};
+
+// Centro de Brasilia como fallback final
+const CENTRO_BSB = { lat: -15.7998, lng: -47.8645 };
+
 async function geocodificarEndereco() {
   const logradouro = document.getElementById('oc-logradouro').value;
   const bairro = document.getElementById('oc-bairro').value;
@@ -1125,16 +1200,36 @@ async function geocodificarEndereco() {
   const info = document.getElementById('geo-info');
   if (!logradouro && !bairro) { showToast('Informe o logradouro e bairro primeiro.', 'error'); return; }
   info.textContent = 'Buscando localizacao...';
-  const coords = await buscarCoordenadas(logradouro, bairro, cidade);
-  if (coords) {
-    document.getElementById('oc-lat').value = coords.lat;
-    document.getElementById('oc-lng').value = coords.lng;
+  info.style.color = 'var(--color-text-muted)';
+
+  // Tentativa 1: Nominatim com endereco completo
+  let coords = await buscarCoordenadas(logradouro, bairro, cidade);
+
+  // Tentativa 2: Nominatim apenas com bairro
+  if (!coords && bairro) {
+    coords = await buscarCoordenadas('', bairro, cidade);
+  }
+
+  // Tentativa 3: Lookup por bairro no dicionario local
+  if (!coords && bairro) {
+    const chave = bairro.toLowerCase().trim();
+    if (COORDS_BAIRROS_BSB[chave]) {
+      coords = COORDS_BAIRROS_BSB[chave];
+    }
+  }
+
+  // Tentativa 4: Centro de Brasilia como fallback final
+  if (!coords) {
+    coords = CENTRO_BSB;
+    info.textContent = 'Endereco nao encontrado. Usando centro de Brasilia como localizacao aproximada.';
+    info.style.color = 'var(--color-alta)';
+  } else {
     info.textContent = `Localizacao encontrada: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
     info.style.color = 'var(--color-encerrada)';
-  } else {
-    info.textContent = 'Localizacao nao encontrada. Ocorrencia sera registrada sem coordenadas.';
-    info.style.color = 'var(--color-alta)';
   }
+
+  document.getElementById('oc-lat').value = coords.lat;
+  document.getElementById('oc-lng').value = coords.lng;
 }
 
 async function registrarOcorrenciaBombeiro() {
@@ -1152,21 +1247,35 @@ async function registrarOcorrenciaBombeiro() {
       latitude: lat, longitude: lng,
     },
   };
+  const denunciaIdCheck = parseInt(document.getElementById('oc-denuncia-id')?.value) || null;
+  if (!denunciaIdCheck) { showToast('Selecione a denuncia base para a ocorrencia.', 'error'); return; }
   if (!dados.descricao) { showToast('Informe a descricao.', 'error'); return; }
   try {
-    await Ocorrencias.criar(dados); closeModal(); showToast('Ocorrencia registrada!', 'success');
+    await Ocorrencias.criar(dados);
+
+    // FIX 2: marcar denuncia como convertida apos criar ocorrencia
+    const denunciaId = parseInt(document.getElementById('oc-denuncia-id')?.value) || null;
+    if (denunciaId) {
+      try {
+        await Denuncias.atualizar(denunciaId, { status: 'convertida' });
+      } catch (e) { console.error('Erro ao converter denuncia:', e); }
+    }
+
+    closeModal();
+    showToast('Ocorrencia registrada! Aparece no Kanban do Comandante.', 'success');
     await carregarTabelaOcorrenciasBombeiro();
-    // Atualiza mapa do comandante se estiver visivel
+    await carregarDenunciasBombeiro();
     if (mapaOcorrencias) {
       mapaOcorrencias.eachLayer((l) => { if (l instanceof L.Marker) mapaOcorrencias.removeLayer(l); });
       await carregarPinsOcorrencias();
     }
-    // Denuncia aprovada usada — recarrega lista do bombeiro (some a aprovada)
-    await carregarDenunciasBombeiro();
+    if (document.getElementById('col-aberta')) {
+      await carregarKanbanOcorrencias();
+    }
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
-function abrirModalAtualizarStatusOcorrencia(oc) {
+async function abrirModalAtualizarStatusOcorrencia(oc) {
   openModal(`Ocorrencia #${oc.id} - ${oc.tipo}`, `
     <div class="form-group"><label>Descricao</label><textarea id="oc-edit-descricao" rows="3">${oc.descricao}</textarea></div>
     <div class="form-row">
@@ -1178,15 +1287,17 @@ function abrirModalAtualizarStatusOcorrencia(oc) {
       </div>
       <div class="form-group"><label>Nr de vitimas</label><input type="number" id="oc-edit-vitimas" min="0" value="${oc.num_vitimas??0}" /></div>
     </div>
-    <div class="form-group"><label>Vincular bombeiro (matricula)</label>
+    <div class="form-group">
+      <label id="label-bombeiro-sel">Vincular bombeiro</label>
       <div style="display:flex;gap:8px;">
-        <input type="text" id="oc-bombeiro-matricula" placeholder="Ex: CB-001" style="flex:1" />
+        <select id="oc-bombeiro-select" style="flex:1"><option value="">Carregando...</option></select>
         <button class="btn-secondary" onclick="vincularBombeiroOcorrencia(${oc.id})">Vincular</button>
       </div>
     </div>
-    <div class="form-group"><label>Adicionar viatura (placa)</label>
+    <div class="form-group">
+      <label id="label-viatura-sel">Adicionar viatura</label>
       <div style="display:flex;gap:8px;">
-        <input type="text" id="oc-viatura-placa" placeholder="Ex: DF-001-AB" style="flex:1" />
+        <select id="oc-viatura-select" style="flex:1"><option value="">Carregando...</option></select>
         <button class="btn-secondary" onclick="adicionarViaturaOcorrencia(${oc.id})">Adicionar</button>
       </div>
     </div>
@@ -1205,14 +1316,82 @@ function abrirModalAtualizarStatusOcorrencia(oc) {
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn-primary" onclick="atualizarStatusOcorrencia(${oc.id})">Salvar</button>
     </div>`);
+
+  // FIX 2: Preencher dropdowns excluindo já alocados nesta ocorrencia
+  try {
+    // Buscar todas ocorrencias ativas para saber quais bombeiros ja estao alocados
+    const [bombeiros, viaturas, bombeiroAlocados, viaturaAlocadas, todasOcorrencias] = await Promise.all([
+      Bombeiros.listar(),
+      Viaturas.listar(),
+      Ocorrencias.listarBombeiros(oc.id).catch(() => []),
+      Ocorrencias.listarViaturas(oc.id).catch(() => []),
+      Ocorrencias.listar(),
+    ]);
+
+    // IDs de bombeiros alocados nesta ocorrencia
+    const idsAlocadosNesta = bombeiroAlocados.map((b) => b.bombeiro_id);
+    const idsViaturasAlocadas = viaturaAlocadas.map((v) => v.viatura_id);
+
+    // IDs de bombeiros alocados em OUTRAS ocorrencias abertas ou em_andamento
+    const outrasOcorrencias = todasOcorrencias.filter((o) =>
+      o.id !== oc.id && ['aberta','em_andamento'].includes(o.status)
+    );
+    const idsEmOutrasOcorrencias = [];
+    for (const outra of outrasOcorrencias) {
+      try {
+        const alocados = await Ocorrencias.listarBombeiros(outra.id);
+        alocados.forEach((a) => idsEmOutrasOcorrencias.push(a.bombeiro_id));
+      } catch (e) {}
+    }
+
+    // Bombeiro disponivel = ativo + nao alocado nesta + nao alocado em outra ocorrencia ativa
+    const bombeirosFiltrados = bombeiros.filter((b) =>
+      b.status === 'ativo' &&
+      !idsAlocadosNesta.includes(b.id) &&
+      !idsEmOutrasOcorrencias.includes(b.id)
+    );
+    const viaturasFiltradas = viaturas.filter((v) =>
+      v.status === 'disponivel' && !idsViaturasAlocadas.includes(v.id)
+    );
+
+    const selB = document.getElementById('oc-bombeiro-select');
+    if (selB) {
+      selB.innerHTML = `<option value="">+ Adicionar bombeiro (${bombeirosFiltrados.length} disp.)...</option>` +
+        bombeirosFiltrados.map((b) => `<option value="${b.id}">${b.nome} (${b.matricula})</option>`).join('');
+    }
+    const selV = document.getElementById('oc-viatura-select');
+    if (selV) {
+      selV.innerHTML = `<option value="">+ Adicionar viatura (${viaturasFiltradas.length} disp.)...</option>` +
+        viaturasFiltradas.map((v) => `<option value="${v.id}">${v.placa} — ${v.modelo}</option>`).join('');
+    }
+  } catch (e) { console.error('Erro ao carregar dropdowns:', e); }
 }
 
 async function solicitarEncerramentoOcorrencia(id) {
+  // Validacao: precisa de >= 2 bombeiros e >= 1 viatura para solicitar encerramento
+  try {
+    const [bombeiros, viaturas] = await Promise.all([
+      Ocorrencias.listarBombeiros(id).catch(() => []),
+      Ocorrencias.listarViaturas(id).catch(() => []),
+    ]);
+    if (bombeiros.length < 2) {
+      showToast('Necessario ao menos 2 bombeiros alocados para solicitar encerramento.', 'error');
+      return;
+    }
+    if (viaturas.length < 1) {
+      showToast('Necessario ao menos 1 viatura alocada para solicitar encerramento.', 'error');
+      return;
+    }
+  } catch (e) {
+    showToast('Erro ao verificar alocacoes.', 'error'); return;
+  }
+
   const motivo = document.getElementById('oc-motivo-encerramento').value || 'Bombeiro solicita encerramento.';
   try {
     await Ocorrencias.atualizar(id, { descricao: `[SOLICITACAO DE ENCERRAMENTO] ${motivo}` });
     showToast('Solicitacao de encerramento enviada ao Comandante!', 'success');
-    closeModal(); await carregarTabelaOcorrenciasBombeiro();
+    closeModal();
+    await carregarTabelaOcorrenciasBombeiro();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
@@ -1229,28 +1408,54 @@ async function atualizarStatusOcorrencia(id) {
 }
 
 async function vincularBombeiroOcorrencia(ocorrenciaId) {
-  const matricula = document.getElementById('oc-bombeiro-matricula').value.trim();
-  if (!matricula) { showToast('Informe a matricula.', 'error'); return; }
+  const sel = document.getElementById('oc-bombeiro-select');
+  const bombeiroId = parseInt(sel?.value);
+  if (!bombeiroId) { showToast('Selecione um bombeiro.', 'error'); return; }
+  const nomeSelecionado = sel.options[sel.selectedIndex]?.text ?? '';
   try {
-    const bombeiros = await Bombeiros.listar();
-    const b = bombeiros.find((x) => x.matricula.toLowerCase() === matricula.toLowerCase());
-    if (!b) { showToast('Bombeiro nao encontrado.', 'error'); return; }
-    await request('POST', `/ocorrencias/${ocorrenciaId}/bombeiros`, { bombeiro_id: b.id });
-    showToast(`${b.nome} vinculado!`, 'success');
-    document.getElementById('oc-bombeiro-matricula').value = '';
+    await Ocorrencias.alocarBombeiro(ocorrenciaId, { bombeiro_id: bombeiroId });
+    showToast(`${nomeSelecionado} vinculado!`, 'success');
+    // Remove imediatamente do select sem recarregar a pagina
+    sel.remove(sel.selectedIndex);
+    sel.value = '';
+    // Atualiza contador no select
+    const disponiveis = sel.options.length - 1;
+    sel.options[0].text = `+ Adicionar bombeiro (${disponiveis} disp.)...`;
+    // Adiciona badge do bombeiro alocado na lista
+    const listaBombeiros = document.querySelector('.lista-bombeiros-alocados');
+    if (listaBombeiros) {
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-info';
+      badge.style.margin = '2px';
+      badge.textContent = nomeSelecionado;
+      // Remove mensagem "nenhum alocado" se existir
+      const vazio = listaBombeiros.querySelector('.text-muted');
+      if (vazio) vazio.remove();
+      listaBombeiros.appendChild(badge);
+    }
+    // Atualiza contador minimo
+    const contadorB = document.getElementById('contador-bombeiros');
+    if (contadorB) {
+      const atual = parseInt(contadorB.dataset.count || '0') + 1;
+      contadorB.dataset.count = atual;
+      contadorB.textContent = `${atual}/2 minimo`;
+      contadorB.style.color = atual >= 2 ? 'var(--color-encerrada)' : 'var(--color-alta)';
+    }
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
 async function adicionarViaturaOcorrencia(ocorrenciaId) {
-  const placa = document.getElementById('oc-viatura-placa').value.trim();
-  if (!placa) { showToast('Informe a placa.', 'error'); return; }
+  const sel = document.getElementById('oc-viatura-select');
+  const viaturaId = parseInt(sel?.value);
+  if (!viaturaId) { showToast('Selecione uma viatura.', 'error'); return; }
+  const placaSelecionada = sel.options[sel.selectedIndex]?.text.split(' —')[0] ?? '';
   try {
-    const viaturas = await Viaturas.listar();
-    const v = viaturas.find((x) => x.placa.toLowerCase() === placa.toLowerCase());
-    if (!v) { showToast('Viatura nao encontrada.', 'error'); return; }
-    await request('POST', `/ocorrencias/${ocorrenciaId}/viaturas`, { viatura_id: v.id });
-    showToast(`Viatura ${v.placa} adicionada!`, 'success');
-    document.getElementById('oc-viatura-placa').value = '';
+    await Ocorrencias.alocarViatura(ocorrenciaId, { viatura_id: viaturaId });
+    showToast(`Viatura ${placaSelecionada} adicionada!`, 'success');
+    // Recarrega modal para refletir nova alocacao
+    const ocorrencias = await Ocorrencias.listar();
+    const oc = ocorrencias.find((x) => x.id === ocorrenciaId);
+    if (oc) await abrirModalAtualizarStatusOcorrencia(oc);
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
@@ -1281,7 +1486,7 @@ async function participarTreinamento(treinamentoId) {
     const bombeiros = await Bombeiros.listar();
     const b = bombeiros.find((x) => x.matricula.toLowerCase() === matricula.toLowerCase());
     if (!b) { showToast('Matricula nao encontrada.', 'error'); return; }
-    await request('POST', `/treinamentos/${treinamentoId}/bombeiros`, { bombeiro_id: b.id, status_participacao: 'inscrito' });
+    await Treinamentos.inscreverBombeiro(treinamentoId, { bombeiro_id: b.id, status_participacao: 'inscrito' });
     closeModal(); showToast(`${b.nome} inscrito!`, 'success');
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
@@ -1324,9 +1529,7 @@ async function carregarOcorrenciasCidadao() {
   if (!container) return;
   try {
     const todas = await Ocorrencias.listar();
-    // Filtra encerradas que foram encerradas há menos de 5 minutos (ainda visíveis)
-    // Na pratica filtramos as que NAO estao encerradas para exibir
-    // Encerradas somem automaticamente via setTimeout de 5min
+    // FIX 6: cidadao nao ve ocorrencias encerradas
     const ocorrencias = todas.filter((oc) => oc.status !== 'encerrada');
     const tabela = criarTabela(
       [
