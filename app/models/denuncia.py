@@ -24,6 +24,4 @@ class Denuncia(Base):
     data_denuncia = Column(DateTime, server_default=func.now(), nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
-    solicitacao = relationship(
-        "Solicitacao", back_populates="denuncia", uselist=False
-    )
+    solicitacao = relationship("Solicitacao", back_populates="denuncia", uselist=False)

@@ -1,5 +1,3 @@
-
-
 BOMBEIRO_BASE = {
     "nome": "Carlos Teste",
     "matricula": "TEST-001",

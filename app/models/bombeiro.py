@@ -1,4 +1,3 @@
-
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
@@ -30,9 +29,7 @@ class Bombeiro(Base):
     equipes = relationship("BombeiroEquipe", back_populates="bombeiro")
     ocorrencias = relationship("OcorrenciaBombeiro", back_populates="bombeiro")
     treinamentos = relationship("BombeiroTreinamento", back_populates="bombeiro")
-    solicitacoes_verificadas = relationship(
-        "Solicitacao", back_populates="comandante"
-    )
+    solicitacoes_verificadas = relationship("Solicitacao", back_populates="comandante")
 
 
 class Equipe(Base):
@@ -54,12 +51,8 @@ class Equipe(Base):
 class BombeiroEquipe(Base):
     __tablename__ = "bombeiro_equipe"
 
-    bombeiro_id = Column(
-        Integer, ForeignKey("bombeiro.id"), primary_key=True
-    )
-    equipe_id = Column(
-        Integer, ForeignKey("equipe.id"), primary_key=True
-    )
+    bombeiro_id = Column(Integer, ForeignKey("bombeiro.id"), primary_key=True)
+    equipe_id = Column(Integer, ForeignKey("equipe.id"), primary_key=True)
     data_alocacao = Column(Date)
     funcao = Column(String(50))
 

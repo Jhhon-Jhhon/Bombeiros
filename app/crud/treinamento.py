@@ -27,7 +27,9 @@ def get_treinamentos(
     query = db.query(Treinamento)
     if status:
         query = query.filter(Treinamento.status == status)
-    return query.order_by(Treinamento.data_inicio.desc()).offset(skip).limit(limit).all()
+    return (
+        query.order_by(Treinamento.data_inicio.desc()).offset(skip).limit(limit).all()
+    )
 
 
 def create_treinamento(db: Session, dados: TreinamentoCreate) -> Treinamento:
@@ -35,7 +37,9 @@ def create_treinamento(db: Session, dados: TreinamentoCreate) -> Treinamento:
     db.add(treinamento)
     db.commit()
     db.refresh(treinamento)
-    logger.info("Treinamento criado: id=%s titulo=%s", treinamento.id, treinamento.titulo)
+    logger.info(
+        "Treinamento criado: id=%s titulo=%s", treinamento.id, treinamento.titulo
+    )
     return treinamento
 
 
@@ -76,14 +80,13 @@ def inscrever_bombeiro(
     db.refresh(inscricao)
     logger.info(
         "Bombeiro id=%s inscrito no treinamento id=%s",
-        dados.bombeiro_id, treinamento_id,
+        dados.bombeiro_id,
+        treinamento_id,
     )
     return inscricao
 
 
-def get_inscritos(
-    db: Session, treinamento_id: int
-) -> list[BombeiroTreinamento]:
+def get_inscritos(db: Session, treinamento_id: int) -> list[BombeiroTreinamento]:
     return (
         db.query(BombeiroTreinamento)
         .filter(BombeiroTreinamento.treinamento_id == treinamento_id)
@@ -110,6 +113,7 @@ def update_inscricao(
     db.refresh(inscricao)
     logger.info(
         "Inscrição atualizada: treinamento_id=%s bombeiro_id=%s",
-        treinamento_id, bombeiro_id,
+        treinamento_id,
+        bombeiro_id,
     )
     return inscricao

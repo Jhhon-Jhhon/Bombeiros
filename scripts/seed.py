@@ -35,7 +35,9 @@ def limpar_banco(db):
     """Remove todos os dados existentes antes de popular."""
     print("🧹 Limpando banco de dados...")
     from sqlalchemy import text
-    db.execute(text("""
+
+    db.execute(
+        text("""
         TRUNCATE TABLE ocorrencia_viatura, ocorrencia_bombeiro,
                        endereco_ocorrencia, ocorrencia,
                        viatura_equipamento, manutencao,
@@ -44,7 +46,8 @@ def limpar_banco(db):
                        solicitacao, denuncia,
                        equipamento, viatura, bombeiro
         RESTART IDENTITY CASCADE
-    """))
+    """)
+    )
     db.commit()
     print("✅ Banco limpo!")
 
@@ -128,21 +131,21 @@ def seed_viaturas(db):
             modelo="Scania P360 AutoBomba",
             tipo=TipoViatura.auto_bomba,
             ano_fabricacao=2019,
-            status=StatusViatura.disponivel,   # disponivel — sem manutenção ativa
+            status=StatusViatura.disponivel,  # disponivel — sem manutenção ativa
         ),
         Viatura(
             placa="DF-002-AB",
             modelo="Mercedes-Benz Atron AutoEscada",
             tipo=TipoViatura.auto_escada,
             ano_fabricacao=2021,
-            status=StatusViatura.disponivel,   # disponivel
+            status=StatusViatura.disponivel,  # disponivel
         ),
         Viatura(
             placa="DF-003-AB",
             modelo="Mercedes-Benz Sprinter UTI",
             tipo=TipoViatura.ambulancia,
             ano_fabricacao=2022,
-            status=StatusViatura.disponivel,   # disponivel
+            status=StatusViatura.disponivel,  # disponivel
         ),
         # DF-004-AB: em_manutencao — terá manutenção pendente vinculada abaixo
         Viatura(
@@ -210,11 +213,15 @@ def seed_viatura_equipamento(db, viaturas, equipamentos):
     """Associa equipamento em_uso à viatura correta via viatura_equipamento."""
     print("🔗 Vinculando equipamentos às viaturas...")
     from sqlalchemy import text
+
     # Aparelho de Respiração Autônoma (equipamentos[3]) → DF-001-AB (viaturas[0])
-    db.execute(text("""
+    db.execute(
+        text("""
         INSERT INTO viatura_equipamento (viatura_id, equipamento_id, quantidade)
         VALUES (:vid, :eid, 1)
-    """), {"vid": viaturas[0].id, "eid": equipamentos[3].id})
+    """),
+        {"vid": viaturas[0].id, "eid": equipamentos[3].id},
+    )
     db.commit()
     print("  ✅ Aparelho de Respiração Autônoma vinculado à DF-001-AB")
 
@@ -229,9 +236,8 @@ def seed_manutencoes(db, viaturas, equipamentos):
             descricao="Revisão geral — troca de óleo, filtros e freios",
             status=StatusManutencao.pendente,
             data_inicio=date(2026, 6, 26),  # data da solicitação (banco NOT NULL)
-            viatura_id=viaturas[3].id,      # DF-004-AB
+            viatura_id=viaturas[3].id,  # DF-004-AB
         ),
-
         # Kit Ferramentas (equipamentos[4]) está em_manutencao → manutenção EM ANDAMENTO
         # Fluxo: técnico já preencheu data_inicio e data_fim ao avançar de pendente → em_andamento
         Manutencao(
@@ -239,11 +245,10 @@ def seed_manutencoes(db, viaturas, equipamentos):
             descricao="Substituição de mangueira hidráulica danificada",
             custo=Decimal("380.00"),
             data_inicio=date(2026, 6, 20),
-            data_fim=date(2026, 6, 30),   # data_fim obrigatória para estar em_andamento
+            data_fim=date(2026, 6, 30),  # data_fim obrigatória para estar em_andamento
             status=StatusManutencao.em_andamento,
             equipamento_id=equipamentos[4].id,  # Kit Ferramentas
         ),
-
         # Manutenção histórica já concluída (viatura que agora está disponivel)
         # Não altera status de nenhuma viatura/equipamento atual
         Manutencao(
@@ -253,7 +258,9 @@ def seed_manutencoes(db, viaturas, equipamentos):
             data_inicio=date(2026, 5, 10),
             data_fim=date(2026, 5, 12),
             status=StatusManutencao.concluida,
-            viatura_id=viaturas[1].id,   # DF-002-AB — agora disponivel (manutenção já encerrada)
+            viatura_id=viaturas[
+                1
+            ].id,  # DF-002-AB — agora disponivel (manutenção já encerrada)
         ),
     ]
     for m in manutencoes:
@@ -276,16 +283,18 @@ def seed_ocorrencias(db, viaturas, bombeiros):
     )
     db.add(oc1)
     db.flush()
-    db.add(EnderecoOcorrencia(
-        ocorrencia_id=oc1.id,
-        logradouro="Eixo Monumental",
-        numero="s/n",
-        bairro="Setor de Divulgação Cultural",
-        cidade="Brasília",
-        cep="70070-350",
-        latitude=-15.7795,
-        longitude=-47.9292,
-    ))
+    db.add(
+        EnderecoOcorrencia(
+            ocorrencia_id=oc1.id,
+            logradouro="Eixo Monumental",
+            numero="s/n",
+            bairro="Setor de Divulgação Cultural",
+            cidade="Brasília",
+            cep="70070-350",
+            latitude=-15.7795,
+            longitude=-47.9292,
+        )
+    )
 
     # Em andamento — acidente com vítimas
     oc2 = Ocorrencia(
@@ -293,21 +302,23 @@ def seed_ocorrencias(db, viaturas, bombeiros):
         descricao="Colisão entre ônibus e automóvel com vítimas presas",
         prioridade=PrioridadeOcorrencia.alta,
         num_vitimas=4,
-        status=StatusOcorrencia.em_andamento,
+        status=StatusOcorrencia.aberta,
         data_abertura=datetime(2026, 6, 12, 10, 15, tzinfo=timezone.utc),
     )
     db.add(oc2)
     db.flush()
-    db.add(EnderecoOcorrencia(
-        ocorrencia_id=oc2.id,
-        logradouro="SGAS 915",
-        numero="s/n",
-        bairro="Setor Hospitalar Sul",
-        cidade="Brasília",
-        cep="70390-150",
-        latitude=-15.7942,
-        longitude=-47.8982,
-    ))
+    db.add(
+        EnderecoOcorrencia(
+            ocorrencia_id=oc2.id,
+            logradouro="SGAS 915",
+            numero="s/n",
+            bairro="Setor Hospitalar Sul",
+            cidade="Brasília",
+            cep="70390-150",
+            latitude=-15.7942,
+            longitude=-47.8982,
+        )
+    )
 
     # Aberta — resgate aquático
     oc3 = Ocorrencia(
@@ -320,16 +331,18 @@ def seed_ocorrencias(db, viaturas, bombeiros):
     )
     db.add(oc3)
     db.flush()
-    db.add(EnderecoOcorrencia(
-        ocorrencia_id=oc3.id,
-        logradouro="QI 13",
-        numero="s/n",
-        bairro="Lago Norte",
-        cidade="Brasília",
-        cep="71535-130",
-        latitude=-15.7276,
-        longitude=-47.8824,
-    ))
+    db.add(
+        EnderecoOcorrencia(
+            ocorrencia_id=oc3.id,
+            logradouro="QI 13",
+            numero="s/n",
+            bairro="Lago Norte",
+            cidade="Brasília",
+            cep="71535-130",
+            latitude=-15.7276,
+            longitude=-47.8824,
+        )
+    )
 
     # Encerrada — inundação
     oc4 = Ocorrencia(
@@ -343,16 +356,18 @@ def seed_ocorrencias(db, viaturas, bombeiros):
     )
     db.add(oc4)
     db.flush()
-    db.add(EnderecoOcorrencia(
-        ocorrencia_id=oc4.id,
-        logradouro="QNN 31",
-        numero="s/n",
-        bairro="Ceilândia Norte",
-        cidade="Brasília",
-        cep="72215-310",
-        latitude=-15.8081,
-        longitude=-48.1101,
-    ))
+    db.add(
+        EnderecoOcorrencia(
+            ocorrencia_id=oc4.id,
+            logradouro="QNN 31",
+            numero="s/n",
+            bairro="Ceilândia Norte",
+            cidade="Brasília",
+            cep="72215-310",
+            latitude=-15.8081,
+            longitude=-48.1101,
+        )
+    )
 
     # Encerrada — incêndio crítico
     oc5 = Ocorrencia(
@@ -366,16 +381,18 @@ def seed_ocorrencias(db, viaturas, bombeiros):
     )
     db.add(oc5)
     db.flush()
-    db.add(EnderecoOcorrencia(
-        ocorrencia_id=oc5.id,
-        logradouro="QSA 3",
-        numero="s/n",
-        bairro="Taguatinga Centro",
-        cidade="Brasília",
-        cep="72015-030",
-        latitude=-15.8327,
-        longitude=-48.0560,
-    ))
+    db.add(
+        EnderecoOcorrencia(
+            ocorrencia_id=oc5.id,
+            logradouro="QSA 3",
+            numero="s/n",
+            bairro="Taguatinga Centro",
+            cidade="Brasília",
+            cep="72015-030",
+            latitude=-15.8327,
+            longitude=-48.0560,
+        )
+    )
 
     db.commit()
     print("  ✅ 5 ocorrências inseridas")
@@ -441,8 +458,8 @@ def main():
     db = SessionLocal()
     try:
         limpar_banco(db)
-        bombeiros  = seed_bombeiros(db)
-        viaturas   = seed_viaturas(db)
+        bombeiros = seed_bombeiros(db)
+        viaturas = seed_viaturas(db)
         equipamentos = seed_equipamentos(db)
         seed_viatura_equipamento(db, viaturas, equipamentos)
         seed_manutencoes(db, viaturas, equipamentos)

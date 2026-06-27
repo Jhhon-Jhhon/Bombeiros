@@ -22,7 +22,9 @@ logger = logging.getLogger("bombeiros")
 router = APIRouter(prefix="/manutencoes", tags=["Manutenções"])
 
 
-@router.post("/", response_model=ManutencaoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=ManutencaoResponse, status_code=status.HTTP_201_CREATED
+)
 def criar_manutencao(dados: ManutencaoCreate, db: Session = Depends(get_db)):
     return create_manutencao(db, dados)
 
@@ -37,8 +39,12 @@ def listar_manutencoes(
     db: Session = Depends(get_db),
 ):
     return get_manutencoes(
-        db, skip=skip, limit=limit, status=status,
-        viatura_id=viatura_id, equipamento_id=equipamento_id,
+        db,
+        skip=skip,
+        limit=limit,
+        status=status,
+        viatura_id=viatura_id,
+        equipamento_id=equipamento_id,
     )
 
 

@@ -20,9 +20,7 @@ def get_equipe_por_nome(db: Session, nome: str) -> Equipe | None:
     return db.query(Equipe).filter(Equipe.nome == nome).first()
 
 
-def get_equipes(
-    db: Session, skip: int = 0, limit: int = 20
-) -> list[Equipe]:
+def get_equipes(db: Session, skip: int = 0, limit: int = 20) -> list[Equipe]:
     return db.query(Equipe).order_by(Equipe.nome).offset(skip).limit(limit).all()
 
 
@@ -35,9 +33,7 @@ def create_equipe(db: Session, dados: EquipeCreate) -> Equipe:
     return equipe
 
 
-def update_equipe(
-    db: Session, equipe_id: int, dados: EquipeUpdate
-) -> Equipe | None:
+def update_equipe(db: Session, equipe_id: int, dados: EquipeUpdate) -> Equipe | None:
     equipe = get_equipe(db, equipe_id)
     if not equipe:
         return None
@@ -63,6 +59,7 @@ def adicionar_bombeiro_equipe(
     db: Session, equipe_id: int, dados: AdicionarBombeiroEquipeRequest
 ) -> BombeiroEquipe:
     from datetime import date
+
     associacao = BombeiroEquipe(
         equipe_id=equipe_id,
         bombeiro_id=dados.bombeiro_id,
@@ -74,16 +71,11 @@ def adicionar_bombeiro_equipe(
     db.refresh(associacao)
     logger.info(
         "Bombeiro id=%s adicionado à equipe id=%s",
-        dados.bombeiro_id, equipe_id,
+        dados.bombeiro_id,
+        equipe_id,
     )
     return associacao
 
 
-def get_membros_equipe(
-    db: Session, equipe_id: int
-) -> list[BombeiroEquipe]:
-    return (
-        db.query(BombeiroEquipe)
-        .filter(BombeiroEquipe.equipe_id == equipe_id)
-        .all()
-    )
+def get_membros_equipe(db: Session, equipe_id: int) -> list[BombeiroEquipe]:
+    return db.query(BombeiroEquipe).filter(BombeiroEquipe.equipe_id == equipe_id).all()

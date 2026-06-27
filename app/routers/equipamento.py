@@ -23,7 +23,9 @@ logger = logging.getLogger("bombeiros")
 router = APIRouter(prefix="/equipamentos", tags=["Equipamentos"])
 
 
-@router.post("/", response_model=EquipamentoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=EquipamentoResponse, status_code=status.HTTP_201_CREATED
+)
 def criar_equipamento(dados: EquipamentoCreate, db: Session = Depends(get_db)):
     if get_equipamento_por_serie(db, dados.numero_serie):
         raise HTTPException(

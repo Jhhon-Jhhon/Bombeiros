@@ -25,9 +25,7 @@ class Manutencao(Base):
     # Ambos os FKs são nullable — RN04: pelo menos um deve ser preenchido
     # Essa regra é validada no schema Pydantic, não aqui
     viatura_id = Column(Integer, ForeignKey("viatura.id"), nullable=True)
-    equipamento_id = Column(
-        Integer, ForeignKey("equipamento.id"), nullable=True
-    )
+    equipamento_id = Column(Integer, ForeignKey("equipamento.id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     viatura = relationship("Viatura", back_populates="manutencoes")

@@ -41,7 +41,9 @@ def create_equipamento(db: Session, dados: EquipamentoCreate) -> Equipamento:
     db.add(equipamento)
     db.commit()
     db.refresh(equipamento)
-    logger.info("Equipamento criado: serie=%s id=%s", equipamento.numero_serie, equipamento.id)
+    logger.info(
+        "Equipamento criado: serie=%s id=%s", equipamento.numero_serie, equipamento.id
+    )
     return equipamento
 
 

@@ -63,12 +63,8 @@ class EnderecoOcorrencia(Base):
 class OcorrenciaBombeiro(Base):
     __tablename__ = "ocorrencia_bombeiro"
 
-    ocorrencia_id = Column(
-        Integer, ForeignKey("ocorrencia.id"), primary_key=True
-    )
-    bombeiro_id = Column(
-        Integer, ForeignKey("bombeiro.id"), primary_key=True
-    )
+    ocorrencia_id = Column(Integer, ForeignKey("ocorrencia.id"), primary_key=True)
+    bombeiro_id = Column(Integer, ForeignKey("bombeiro.id"), primary_key=True)
     funcao = Column(String(50))
     data_participacao = Column(DateTime, server_default=func.now())
 
@@ -79,12 +75,8 @@ class OcorrenciaBombeiro(Base):
 class OcorrenciaViatura(Base):
     __tablename__ = "ocorrencia_viatura"
 
-    ocorrencia_id = Column(
-        Integer, ForeignKey("ocorrencia.id"), primary_key=True
-    )
-    viatura_id = Column(
-        Integer, ForeignKey("viatura.id"), primary_key=True
-    )
+    ocorrencia_id = Column(Integer, ForeignKey("ocorrencia.id"), primary_key=True)
+    viatura_id = Column(Integer, ForeignKey("viatura.id"), primary_key=True)
     funcao = Column(String(50))
     hora_inicio = Column(DateTime, server_default=func.now())
     hora_fim = Column(DateTime)

@@ -29,7 +29,9 @@ logger = logging.getLogger("bombeiros")
 router = APIRouter(prefix="/treinamentos", tags=["Treinamentos"])
 
 
-@router.post("/", response_model=TreinamentoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=TreinamentoResponse, status_code=status.HTTP_201_CREATED
+)
 def criar_treinamento(dados: TreinamentoCreate, db: Session = Depends(get_db)):
     return create_treinamento(db, dados)
 

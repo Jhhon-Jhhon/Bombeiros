@@ -10,9 +10,7 @@ from app.database import Base, get_db
 from app.main import app
 
 engine_test = create_engine(settings.TEST_DATABASE_URL)
-TestingSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine_test
-)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_test)
 
 
 def override_get_db():

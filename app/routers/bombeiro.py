@@ -37,7 +37,9 @@ def criar_bombeiro(dados: BombeiroCreate, db: Session = Depends(get_db)):
 def listar_bombeiros(
     skip: int = Query(default=0, ge=0, description="Registros a pular"),
     limit: int = Query(default=20, ge=1, le=100, description="Máximo por página"),
-    status: StatusBombeiro | None = Query(default=None, description="Filtrar por status"),
+    status: StatusBombeiro | None = Query(
+        default=None, description="Filtrar por status"
+    ),
     nome: str | None = Query(default=None, description="Filtrar por nome (parcial)"),
     db: Session = Depends(get_db),
 ):

@@ -17,9 +17,7 @@ class Solicitacao(Base):
         Integer, ForeignKey("denuncia.id"), nullable=False, unique=True
     )
     # FK para Bombeiro (o comandante que verificou)
-    comandante_id = Column(
-        Integer, ForeignKey("bombeiro.id"), nullable=True
-    )
+    comandante_id = Column(Integer, ForeignKey("bombeiro.id"), nullable=True)
 
     tipo = Column(String(50), nullable=False)
     prioridade = Column(String(50))
@@ -36,6 +34,4 @@ class Solicitacao(Base):
 
     denuncia = relationship("Denuncia", back_populates="solicitacao")
     comandante = relationship("Bombeiro", back_populates="solicitacoes_verificadas")
-    ocorrencia = relationship(
-        "Ocorrencia", back_populates="solicitacao", uselist=False
-    )
+    ocorrencia = relationship("Ocorrencia", back_populates="solicitacao", uselist=False)

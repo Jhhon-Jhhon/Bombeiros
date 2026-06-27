@@ -57,8 +57,10 @@ def listar_viaturas(
 def buscar_viatura(viatura_id: int, db: Session = Depends(get_db)):
     viatura = get_viatura(db, viatura_id)
     if not viatura:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Viatura id={viatura_id} não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Viatura id={viatura_id} não encontrada",
+        )
     return viatura
 
 
@@ -68,16 +70,21 @@ def atualizar_viatura(
 ):
     viatura = update_viatura(db, viatura_id, dados)
     if not viatura:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Viatura id={viatura_id} não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Viatura id={viatura_id} não encontrada",
+        )
     return viatura
 
 
 @router.delete("/{viatura_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remover_viatura(viatura_id: int, db: Session = Depends(get_db)):
     if not delete_viatura(db, viatura_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Viatura id={viatura_id} não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Viatura id={viatura_id} não encontrada",
+        )
+
 
 @router.post(
     "/{viatura_id}/equipamentos",
@@ -112,9 +119,7 @@ def associar_equipamento_viatura(
     "/{viatura_id}/equipamentos",
     response_model=list[ViaturaEquipamentoResponse],
 )
-def listar_equipamentos_viatura(
-    viatura_id: int, db: Session = Depends(get_db)
-):
+def listar_equipamentos_viatura(viatura_id: int, db: Session = Depends(get_db)):
     """Lista todos os equipamentos de uma viatura."""
     if not get_viatura(db, viatura_id):
         raise HTTPException(

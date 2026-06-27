@@ -33,7 +33,9 @@ def get_ocorrencias(
     query = db.query(Ocorrencia)
     if status:
         query = query.filter(Ocorrencia.status == status)
-    return query.order_by(Ocorrencia.data_abertura.desc()).offset(skip).limit(limit).all()
+    return (
+        query.order_by(Ocorrencia.data_abertura.desc()).offset(skip).limit(limit).all()
+    )
 
 
 def create_ocorrencia(db: Session, dados: OcorrenciaCreate) -> Ocorrencia:
@@ -60,6 +62,7 @@ def update_ocorrencia(
     db: Session, ocorrencia_id: int, dados: OcorrenciaUpdate
 ) -> Ocorrencia | None:
     from datetime import datetime, timezone
+
     ocorrencia = get_ocorrencia(db, ocorrencia_id)
     if not ocorrencia:
         return None
@@ -90,6 +93,7 @@ def delete_ocorrencia(db: Session, ocorrencia_id: int) -> bool:
 
 # ── Alocação de Viatura ───────────────────────────────────────────────────────
 
+
 def viatura_esta_em_atendimento(db: Session, viatura_id: int) -> bool:
     viatura = db.query(Viatura).filter(Viatura.id == viatura_id).first()
     if not viatura:
@@ -108,7 +112,9 @@ def alocar_viatura(
     db.add(alocacao)
     db.commit()
     db.refresh(alocacao)
-    logger.info("Viatura id=%s alocada à ocorrência id=%s", dados.viatura_id, ocorrencia_id)
+    logger.info(
+        "Viatura id=%s alocada à ocorrência id=%s", dados.viatura_id, ocorrencia_id
+    )
     return alocacao
 
 
@@ -124,6 +130,7 @@ def get_viaturas_da_ocorrencia(
 
 # ── Alocação de Bombeiro ──────────────────────────────────────────────────────
 
+
 def alocar_bombeiro(
     db: Session, ocorrencia_id: int, dados: AlocarBombeiroRequest
 ) -> OcorrenciaBombeiro:
@@ -135,7 +142,9 @@ def alocar_bombeiro(
     db.add(alocacao)
     db.commit()
     db.refresh(alocacao)
-    logger.info("Bombeiro id=%s alocado à ocorrência id=%s", dados.bombeiro_id, ocorrencia_id)
+    logger.info(
+        "Bombeiro id=%s alocado à ocorrência id=%s", dados.bombeiro_id, ocorrencia_id
+    )
     return alocacao
 
 

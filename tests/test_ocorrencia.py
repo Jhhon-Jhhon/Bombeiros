@@ -21,13 +21,16 @@ def test_regra_negocio_viatura_em_atendimento(client):
     Coloca a viatura em atendimento via PUT antes de testar o bloqueio.
     """
     # Cria uma viatura
-    viatura = client.post("/viaturas/", json={
-        "placa": "RN01-TEST",
-        "modelo": "Mercedes Atego",
-        "tipo": "ambulancia",
-        "ano_fabricacao": 2021,
-        "status": "disponivel",
-    }).json()
+    viatura = client.post(
+        "/viaturas/",
+        json={
+            "placa": "RN01-TEST",
+            "modelo": "Mercedes Atego",
+            "tipo": "ambulancia",
+            "ano_fabricacao": 2021,
+            "status": "disponivel",
+        },
+    ).json()
 
     # Muda o status para em_atendimento diretamente
     client.put(

@@ -1264,68 +1264,110 @@ async function registrarOcorrenciaBombeiro() {
 }
 
 async function abrirModalAtualizarStatusOcorrencia(oc) {
+  // Carregar alocacoes atuais para mostrar no modal e validar regras
+  let bombeiroAlocados = [], viaturaAlocadas = [];
+  try {
+    [bombeiroAlocados, viaturaAlocadas] = await Promise.all([
+      Ocorrencias.listarBombeiros(oc.id).catch(() => []),
+      Ocorrencias.listarViaturas(oc.id).catch(() => []),
+    ]);
+  } catch (e) {}
+
+  const qtdBombeiros = bombeiroAlocados.length;
+  const qtdViaturas  = viaturaAlocadas.length;
+
+  // Regra: so pode ir para em_andamento com >= 1 viatura e >= 2 bombeiros
+  const podeAvancar = qtdViaturas >= 1 && qtdBombeiros >= 2;
+
+  // Instrucao de progresso baseada no status atual
+  let instrucao = '';
+  if (oc.status === 'aberta') {
+    const faltaBombeiros = Math.max(0, 2 - qtdBombeiros);
+    const faltaViatura   = qtdViaturas < 1;
+    instrucao = `
+      <div style="background:rgba(255,193,7,0.08);border:1px solid var(--color-alta);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;">
+        <strong style="color:var(--color-alta);">Requisitos para iniciar operacao:</strong>
+        <div style="margin-top:6px;display:flex;gap:16px;">
+          <span style="color:${qtdBombeiros>=2?'var(--color-encerrada)':'var(--color-alta)'};">
+            ${qtdBombeiros>=2?'✓':'✗'} Bombeiros: ${qtdBombeiros}/2 minimo
+          </span>
+          <span style="color:${qtdViaturas>=1?'var(--color-encerrada)':'var(--color-alta)'};">
+            ${qtdViaturas>=1?'✓':'✗'} Viaturas: ${qtdViaturas}/1 minimo
+          </span>
+        </div>
+        ${!podeAvancar ? '<div style="margin-top:6px;color:var(--color-alta);">Aloque os recursos necessarios antes de iniciar.</div>' : ''}
+      </div>`;
+  } else if (oc.status === 'em_andamento') {
+    instrucao = `
+      <div style="background:rgba(52,152,219,0.08);border:1px solid var(--color-info);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;">
+        <strong style="color:var(--color-info);">Operacao em andamento</strong><br>
+        Quando finalizar, solicite o encerramento ao Comandante.
+      </div>`;
+  }
+
+  // Select de status: aberta so mostra em_andamento se podeAvancar
+  const opcoesStatus = oc.status === 'aberta'
+    ? `<option value="aberta" selected>Aberta</option>
+       <option value="em_andamento" ${!podeAvancar ? 'disabled' : ''}>Em andamento${!podeAvancar ? ' (aloque recursos primeiro)' : ''}</option>`
+    : `<option value="em_andamento" selected>Em andamento</option>`;
+
   openModal(`Ocorrencia #${oc.id} - ${oc.tipo}`, `
+    ${instrucao}
     <div class="form-group"><label>Descricao</label><textarea id="oc-edit-descricao" rows="3">${oc.descricao}</textarea></div>
     <div class="form-row">
       <div class="form-group"><label>Status</label>
-        <select id="oc-edit-status">
-          <option value="aberta" ${oc.status==='aberta'?'selected':''}>Aberta</option>
-          <option value="em_andamento" ${oc.status==='em_andamento'?'selected':''}>Em andamento</option>
-        </select>
+        <select id="oc-edit-status">${opcoesStatus}</select>
       </div>
-      <div class="form-group"><label>Nr de vitimas</label><input type="number" id="oc-edit-vitimas" min="0" value="${oc.num_vitimas??0}" /></div>
+      <div class="form-group"><label>Nr de vitimas</label>
+        <input type="number" id="oc-edit-vitimas" min="0" value="${oc.num_vitimas??0}" />
+      </div>
     </div>
     <div class="form-group">
-      <label id="label-bombeiro-sel">Vincular bombeiro</label>
+      <label>Vincular bombeiro</label>
       <div style="display:flex;gap:8px;">
         <select id="oc-bombeiro-select" style="flex:1"><option value="">Carregando...</option></select>
         <button class="btn-secondary" onclick="vincularBombeiroOcorrencia(${oc.id})">Vincular</button>
       </div>
     </div>
     <div class="form-group">
-      <label id="label-viatura-sel">Adicionar viatura</label>
+      <label>Adicionar viatura</label>
       <div style="display:flex;gap:8px;">
         <select id="oc-viatura-select" style="flex:1"><option value="">Carregando...</option></select>
         <button class="btn-secondary" onclick="adicionarViaturaOcorrencia(${oc.id})">Adicionar</button>
       </div>
     </div>
+    ${oc.status === 'em_andamento' ? `
     <div style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:12px;">
-      <p class="text-muted" style="font-size:12px;margin-bottom:8px;">
-        Para solicitar o encerramento, informe o motivo e clique no botao abaixo.
-      </p>
       <div class="form-group"><label>Motivo do encerramento</label>
         <input type="text" id="oc-motivo-encerramento" placeholder="Ex: Situacao controlada." />
       </div>
       <button class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="solicitarEncerramentoOcorrencia(${oc.id})">
         Solicitar encerramento ao Comandante
       </button>
-    </div>
+    </div>` : ''}
     <div class="form-actions">
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn-primary" onclick="atualizarStatusOcorrencia(${oc.id})">Salvar</button>
     </div>`);
 
   try {
-    const [bombeiros, viaturas, bombeiroAlocados, viaturaAlocadas, todasOcorrencias] = await Promise.all([
-      Bombeiros.listar(), Viaturas.listar(),
-      Ocorrencias.listarBombeiros(oc.id).catch(() => []),
-      Ocorrencias.listarViaturas(oc.id).catch(() => []),
-      Ocorrencias.listar(),
+    const [bombeiros, viaturas, todasOcorrencias] = await Promise.all([
+      Bombeiros.listar(), Viaturas.listar(), Ocorrencias.listar(),
     ]);
-    const idsAlocadosNesta = bombeiroAlocados.map((b) => b.bombeiro_id);
+    const idsAlocadosNesta   = bombeiroAlocados.map((b) => b.bombeiro_id);
     const idsViaturasAlocadas = viaturaAlocadas.map((v) => v.viatura_id);
-    const outrasOcorrencias = todasOcorrencias.filter((o) =>
+    const outrasOcorrencias  = todasOcorrencias.filter((o) =>
       o.id !== oc.id && ['aberta','em_andamento'].includes(o.status)
     );
-    const idsEmOutrasOcorrencias = [];
+    const idsEmOutras = [];
     for (const outra of outrasOcorrencias) {
       try {
-        const alocados = await Ocorrencias.listarBombeiros(outra.id);
-        alocados.forEach((a) => idsEmOutrasOcorrencias.push(a.bombeiro_id));
+        const al = await Ocorrencias.listarBombeiros(outra.id);
+        al.forEach((a) => idsEmOutras.push(a.bombeiro_id));
       } catch (e) {}
     }
     const bombeirosFiltrados = bombeiros.filter((b) =>
-      b.status === 'ativo' && !idsAlocadosNesta.includes(b.id) && !idsEmOutrasOcorrencias.includes(b.id)
+      b.status === 'ativo' && !idsAlocadosNesta.includes(b.id) && !idsEmOutras.includes(b.id)
     );
     const viaturasFiltradas = viaturas.filter((v) =>
       v.status === 'disponivel' && !idsViaturasAlocadas.includes(v.id)
@@ -1344,30 +1386,88 @@ async function abrirModalAtualizarStatusOcorrencia(oc) {
 }
 
 async function solicitarEncerramentoOcorrencia(id) {
+  // Verificar requisitos minimos (redundante mas seguro)
+  let bombeiros = [], viaturas = [];
   try {
-    const [bombeiros, viaturas] = await Promise.all([
+    [bombeiros, viaturas] = await Promise.all([
       Ocorrencias.listarBombeiros(id).catch(() => []),
       Ocorrencias.listarViaturas(id).catch(() => []),
     ]);
-    if (bombeiros.length < 2) { showToast('Necessario ao menos 2 bombeiros alocados para solicitar encerramento.', 'error'); return; }
-    if (viaturas.length < 1) { showToast('Necessario ao menos 1 viatura alocada para solicitar encerramento.', 'error'); return; }
   } catch (e) { showToast('Erro ao verificar alocacoes.', 'error'); return; }
+
+  if (bombeiros.length < 2) { showToast('Necessario ao menos 2 bombeiros alocados para solicitar encerramento.', 'error'); return; }
+  if (viaturas.length < 1)  { showToast('Necessario ao menos 1 viatura alocada para solicitar encerramento.', 'error'); return; }
+
+  // Dialogo de confirmacao antes de enviar
+  const confirmado = await confirmarEncerramento();
+  if (!confirmado) return;
+
   const motivo = document.getElementById('oc-motivo-encerramento').value || 'Bombeiro solicita encerramento.';
   try {
     await Ocorrencias.atualizar(id, { descricao: `[SOLICITACAO DE ENCERRAMENTO] ${motivo}` });
     showToast('Solicitacao de encerramento enviada ao Comandante!', 'success');
-    closeModal(); await carregarTabelaOcorrenciasBombeiro();
+    closeModal();
+    await carregarTabelaOcorrenciasBombeiro();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
+// Dialogo de confirmacao de encerramento — retorna Promise<boolean>
+function confirmarEncerramento() {
+  return new Promise((resolve) => {
+    document.getElementById('dialogo-encerramento')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'dialogo-encerramento';
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:9999;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.6);`;
+    overlay.innerHTML = `
+      <div style="background:var(--color-surface);border:1px solid var(--color-border);
+        border-radius:12px;padding:24px;max-width:360px;width:90%;text-align:center;">
+        <div style="font-size:18px;font-weight:600;margin-bottom:8px;">Confirmar encerramento</div>
+        <p style="color:var(--color-text-muted);font-size:13px;margin-bottom:20px;">
+          Tem certeza que deseja solicitar o encerramento desta operacao ao Comandante?
+        </p>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <button id="enc-nao" class="btn-secondary" style="min-width:80px;">Nao</button>
+          <button id="enc-sim" class="btn-primary"   style="min-width:80px;">Sim</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('enc-sim').onclick = () => { overlay.remove(); resolve(true); };
+    document.getElementById('enc-nao').onclick = () => { overlay.remove(); resolve(false); };
+  });
+}
+
 async function atualizarStatusOcorrencia(id) {
+  const novoStatus = document.getElementById('oc-edit-status').value;
+
+  // Bloquear avanco para em_andamento sem requisitos minimos
+  if (novoStatus === 'em_andamento') {
+    let bombeiros = [], viaturas = [];
+    try {
+      [bombeiros, viaturas] = await Promise.all([
+        Ocorrencias.listarBombeiros(id).catch(() => []),
+        Ocorrencias.listarViaturas(id).catch(() => []),
+      ]);
+    } catch (e) {}
+    if (bombeiros.length < 2) {
+      showToast('Aloque ao menos 2 bombeiros antes de iniciar a operacao.', 'error'); return;
+    }
+    if (viaturas.length < 1) {
+      showToast('Aloque ao menos 1 viatura antes de iniciar a operacao.', 'error'); return;
+    }
+  }
+
   const dados = {
-    status: document.getElementById('oc-edit-status').value,
-    descricao: document.getElementById('oc-edit-descricao').value,
+    status:      novoStatus,
+    descricao:   document.getElementById('oc-edit-descricao').value,
     num_vitimas: parseInt(document.getElementById('oc-edit-vitimas').value) || 0,
   };
   try {
-    await Ocorrencias.atualizar(id, dados); closeModal(); showToast('Ocorrencia atualizada!', 'success');
+    await Ocorrencias.atualizar(id, dados);
+    closeModal();
+    showToast('Ocorrencia atualizada!', 'success');
     await carregarTabelaOcorrenciasBombeiro();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }

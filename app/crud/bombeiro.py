@@ -16,11 +16,7 @@ def get_bombeiro(db: Session, bombeiro_id: int) -> Bombeiro | None:
 
 def get_bombeiro_por_matricula(db: Session, matricula: str) -> Bombeiro | None:
     """Busca por matrícula — usado para verificar duplicatas."""
-    return (
-        db.query(Bombeiro)
-        .filter(Bombeiro.matricula == matricula.upper())
-        .first()
-    )
+    return db.query(Bombeiro).filter(Bombeiro.matricula == matricula.upper()).first()
 
 
 def get_bombeiros(
@@ -71,7 +67,9 @@ def update_bombeiro(
 
     db.commit()
     db.refresh(bombeiro)
-    logger.info("Bombeiro atualizado: id=%s campos=%s", bombeiro_id, list(campos.keys()))
+    logger.info(
+        "Bombeiro atualizado: id=%s campos=%s", bombeiro_id, list(campos.keys())
+    )
     return bombeiro
 
 

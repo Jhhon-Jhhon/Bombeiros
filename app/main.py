@@ -17,7 +17,6 @@ from app.routers import (
     viatura,
 )
 
-
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger("bombeiros")
 

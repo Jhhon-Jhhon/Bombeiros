@@ -62,7 +62,7 @@ class StatusEquipamento(enum.Enum):
     disponivel = "disponivel"
     em_uso = "em_uso"
     em_manutencao = "em_manutencao"
-    inativo = "inativo"          # adicionado: equipamento fora de operação
+    inativo = "inativo"  # adicionado: equipamento fora de operação
 
 
 class TipoEquipamento(enum.Enum):

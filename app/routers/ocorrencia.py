@@ -33,7 +33,9 @@ logger = logging.getLogger("bombeiros")
 router = APIRouter(prefix="/ocorrencias", tags=["Ocorrências"])
 
 
-@router.post("/", response_model=OcorrenciaResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=OcorrenciaResponse, status_code=status.HTTP_201_CREATED
+)
 def criar_ocorrencia(dados: OcorrenciaCreate, db: Session = Depends(get_db)):
     """Registra uma nova ocorrência com endereço."""
     return create_ocorrencia(db, dados)
@@ -86,6 +88,7 @@ def remover_ocorrencia(ocorrencia_id: int, db: Session = Depends(get_db)):
 
 # ── Viaturas ──────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/{ocorrencia_id}/viaturas",
     response_model=OcorrenciaViaturaResponse,
@@ -111,7 +114,8 @@ def alocar_viatura_ocorrencia(
     if viatura_esta_em_atendimento(db, dados.viatura_id):
         logger.warning(
             "Tentativa de alocar viatura id=%s em atendimento à ocorrência id=%s",
-            dados.viatura_id, ocorrencia_id,
+            dados.viatura_id,
+            ocorrencia_id,
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -127,9 +131,7 @@ def alocar_viatura_ocorrencia(
     "/{ocorrencia_id}/viaturas",
     response_model=list[OcorrenciaViaturaResponse],
 )
-def listar_viaturas_ocorrencia(
-    ocorrencia_id: int, db: Session = Depends(get_db)
-):
+def listar_viaturas_ocorrencia(ocorrencia_id: int, db: Session = Depends(get_db)):
     """Lista todas as viaturas alocadas a uma ocorrência."""
     if not get_ocorrencia(db, ocorrencia_id):
         raise HTTPException(
@@ -140,6 +142,7 @@ def listar_viaturas_ocorrencia(
 
 
 # ── Bombeiros ─────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/{ocorrencia_id}/bombeiros",
@@ -169,9 +172,7 @@ def alocar_bombeiro_ocorrencia(
     "/{ocorrencia_id}/bombeiros",
     response_model=list[OcorrenciaBombeiroResponse],
 )
-def listar_bombeiros_ocorrencia(
-    ocorrencia_id: int, db: Session = Depends(get_db)
-):
+def listar_bombeiros_ocorrencia(ocorrencia_id: int, db: Session = Depends(get_db)):
     """Lista todos os bombeiros alocados a uma ocorrência."""
     if not get_ocorrencia(db, ocorrencia_id):
         raise HTTPException(

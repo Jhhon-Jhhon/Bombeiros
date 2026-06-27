@@ -22,7 +22,9 @@ logger = logging.getLogger("bombeiros")
 router = APIRouter(prefix="/solicitacoes", tags=["Solicitações"])
 
 
-@router.post("/", response_model=SolicitacaoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=SolicitacaoResponse, status_code=status.HTTP_201_CREATED
+)
 def criar_solicitacao(dados: SolicitacaoCreate, db: Session = Depends(get_db)):
     """Cria uma solicitação a partir de uma denúncia verificada."""
     return create_solicitacao(db, dados)

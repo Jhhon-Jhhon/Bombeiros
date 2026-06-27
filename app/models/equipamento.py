@@ -28,12 +28,8 @@ class Equipamento(Base):
 class ViaturaEquipamento(Base):
     __tablename__ = "viatura_equipamento"
 
-    viatura_id = Column(
-        Integer, ForeignKey("viatura.id"), primary_key=True
-    )
-    equipamento_id = Column(
-        Integer, ForeignKey("equipamento.id"), primary_key=True
-    )
+    viatura_id = Column(Integer, ForeignKey("viatura.id"), primary_key=True)
+    equipamento_id = Column(Integer, ForeignKey("equipamento.id"), primary_key=True)
     quantidade = Column(Integer, nullable=False, default=1)
     observacao = Column(String(150))
 

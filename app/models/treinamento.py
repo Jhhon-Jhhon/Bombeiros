@@ -31,12 +31,8 @@ class Treinamento(Base):
 class BombeiroTreinamento(Base):
     __tablename__ = "bombeiro_treinamento"
 
-    bombeiro_id = Column(
-        Integer, ForeignKey("bombeiro.id"), primary_key=True
-    )
-    treinamento_id = Column(
-        Integer, ForeignKey("treinamento.id"), primary_key=True
-    )
+    bombeiro_id = Column(Integer, ForeignKey("bombeiro.id"), primary_key=True)
+    treinamento_id = Column(Integer, ForeignKey("treinamento.id"), primary_key=True)
     status_participacao = Column(
         SAEnum(StatusParticipacao),
         nullable=False,
