@@ -46,8 +46,16 @@ O sistema opera com quatro perfis distintos, cada um com responsabilidades e per
 
 **Frontend**
 - HTML5 / CSS3 / JavaScript (Vanilla)
-- Leaflet.js — mapas interativos
-- Nominatim (OpenStreetMap) — geocodificação
+- Leaflet.js — mapas interativos *(recurso adicional, não previsto no escopo original)*
+- Nominatim (OpenStreetMap) — geocodificação de endereços em 4 níveis de fallback *(recurso adicional)*
+
+> **Nota sobre recursos adicionais:** O escopo original do projeto previa apenas a API REST. Os itens abaixo foram implementados como melhorias além do requisitado:
+> - **Kanban de ocorrências** (Comandante) e **Kanban de manutenções** (Técnico de Manutenção) — painéis visuais com fluxo de status controlado
+> - **Mapa interativo** com pins de ocorrências ativas e geocodificação automática de endereços
+> - **Portal do Cidadão** — interface separada para registro de denúncias com mensagem de confirmação
+> - **Frontend completo com 4 perfis** — Comandante, Bombeiro, Técnico de Manutenção e Cidadão, cada um com fluxos e restrições próprias
+> - **Controle automático de status** — manutenções alteram automaticamente o status de viaturas e equipamentos
+> - **CI/CD via GitHub Actions** com matrix de versões Python (3.10, 3.11, 3.12)
 
 **CI/CD**
 - GitHub Actions — pipeline com matrix Python 3.10 / 3.11 / 3.12
@@ -84,8 +92,7 @@ O backend segue o padrão de quatro camadas:
 ## Funcionalidades por Perfil
 
 ### Cidadão
-- Registrar denúncias com endereço, tipo e descrição
-- Acompanhar ocorrências ativas em mapa interativo
+- Registrar denúncias com nome, endereço, tipo e descrição
 
 ### Comandante
 - Analisar e aprovar/arquivar denúncias
@@ -376,4 +383,4 @@ bombeiros/
 
 ## Autor
 
-Desenvolvido por **João Antônio Da Silva** como projeto acadêmico — 2026.
+Desenvolvido por **João** como projeto acadêmico — 2026.

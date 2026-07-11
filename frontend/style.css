@@ -17,15 +17,31 @@
   --color-aberta:        #e67e22;
   --color-em-andamento:  #2980b9;
   --color-encerrada:     #27ae60;
+  --color-info:          #2980b9;
 
   --color-critica:       #e74c3c;
   --color-alta:          #e67e22;
   --color-media:         #f1c40f;
   --color-baixa:         #2ecc71;
 
-  --radius:   8px;
+  /* Kanban ocorrências — tons de laranja/azul/vermelho */
+  --kanban-oc-aberta:       #e67e22;
+  --kanban-oc-andamento:    #2980b9;
+  --kanban-oc-encerrada:    #27ae60;
+  --kanban-oc-bg:           #12151f;
+  --kanban-oc-card-accent:  #c0392b;
+
+  /* Kanban manutenções — tons de roxo/verde */
+  --kanban-mn-pendente:     #8e44ad;
+  --kanban-mn-andamento:    #16a085;
+  --kanban-mn-concluida:    #27ae60;
+  --kanban-mn-inativa:      #c0392b;
+  --kanban-mn-bg:           #0f1a18;
+  --kanban-mn-card-accent:  #8e44ad;
+
+  --radius:    8px;
   --radius-lg: 12px;
-  --shadow:   0 2px 8px rgba(0,0,0,0.4);
+  --shadow:    0 2px 8px rgba(0,0,0,0.4);
 }
 
 /* =============================================
@@ -47,7 +63,7 @@ body {
 }
 
 /* =============================================
-   TOPBAR
+   TOPBAR — Sistema Interno
    ============================================= */
 .topbar {
   position: fixed;
@@ -65,6 +81,12 @@ body {
   box-shadow: var(--shadow);
 }
 
+/* TOPBAR — Portal do Cidadão */
+.topbar-cidadao {
+  background: #0d1f1a;
+  border-bottom: 1px solid #1a4a3a;
+}
+
 .topbar-brand {
   display: flex;
   align-items: center;
@@ -74,12 +96,45 @@ body {
   letter-spacing: 0.3px;
 }
 
-.brand-icon {
-  font-size: 22px;
+.brand-icon { font-size: 22px; }
+
+.brand-name { color: var(--color-primary-light); }
+
+.topbar-cidadao .brand-name { color: #2ecc71; }
+
+/* Botão Portal do Cidadão na topbar interna */
+.btn-portal-cidadao {
+  padding: 6px 16px;
+  border-radius: var(--radius);
+  border: 1px solid #27ae60;
+  background: transparent;
+  color: #27ae60;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.brand-name {
-  color: var(--color-primary-light);
+.btn-portal-cidadao:hover {
+  background: rgba(39,174,96,0.1);
+}
+
+/* Botão Voltar na topbar do cidadão */
+.btn-voltar-sistema {
+  padding: 6px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-voltar-sistema:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
 }
 
 /* Botões de perfil */
@@ -123,7 +178,7 @@ body {
 }
 
 /* =============================================
-   SISTEMA DE VIEWS (troca de perfil)
+   SISTEMA DE VIEWS
    ============================================= */
 .view {
   display: none;
@@ -149,8 +204,13 @@ body {
   font-size: 13px;
 }
 
+/* Header especial do cidadão */
+.cidadao-header h1 {
+  color: #2ecc71;
+}
+
 /* =============================================
-   LAYOUT DO COMANDANTE (mapa + kanban)
+   LAYOUT DO COMANDANTE
    ============================================= */
 .commander-layout {
   display: grid;
@@ -160,13 +220,11 @@ body {
 }
 
 @media (max-width: 1100px) {
-  .commander-layout {
-    grid-template-columns: 1fr;
-  }
+  .commander-layout { grid-template-columns: 1fr; }
 }
 
 /* =============================================
-   PANEL (container com header)
+   PANELS
    ============================================= */
 .map-panel,
 .kanban-panel {
@@ -174,6 +232,16 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+}
+
+/* Kanban de ocorrências — borda superior vermelha */
+.kanban-panel.kanban-ocorrencias {
+  border-top: 3px solid var(--color-primary);
+}
+
+/* Kanban de manutenções — borda superior roxa */
+.kanban-panel.kanban-manutencao {
+  border-top: 3px solid var(--kanban-mn-pendente);
 }
 
 .panel-header {
@@ -198,7 +266,6 @@ body {
   z-index: 1;
 }
 
-/* Popup customizado do Leaflet */
 .leaflet-popup-content-wrapper {
   background: var(--color-surface-2);
   color: var(--color-text);
@@ -207,9 +274,7 @@ body {
   box-shadow: var(--shadow);
 }
 
-.leaflet-popup-tip {
-  background: var(--color-surface-2);
-}
+.leaflet-popup-tip { background: var(--color-surface-2); }
 
 .leaflet-popup-content {
   margin: 12px 16px;
@@ -236,23 +301,45 @@ body {
 }
 
 /* =============================================
-   KANBAN
+   KANBAN — BASE
    ============================================= */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   padding: 14px;
   height: 420px;
   overflow: hidden;
 }
 
+/* 3 colunas — ocorrências */
+.kanban-board#kanban-ocorrencias {
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--kanban-oc-bg);
+}
+
+/* 4 colunas — manutenções (definido inline no HTML gerado pelo JS) */
+.kanban-manutencao .kanban-board {
+  height: 500px;
+  background: var(--kanban-mn-bg);
+}
+
 .kanban-col {
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
   border-radius: var(--radius);
   overflow: hidden;
+}
+
+/* Coluna ocorrências */
+.kanban-ocorrencias .kanban-col {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Coluna manutenções */
+.kanban-manutencao .kanban-col {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(142,68,173,0.15);
 }
 
 .kanban-col-header {
@@ -266,32 +353,51 @@ body {
   align-items: center;
 }
 
-.status-aberta       { background: rgba(230,126,34,0.15); color: var(--color-aberta); }
-.status-em-andamento { background: rgba(41,128,185,0.15); color: var(--color-em-andamento); }
-.status-encerrada    { background: rgba(39,174,96,0.15);  color: var(--color-encerrada); }
-
-.col-count {
-  background: rgba(255,255,255,0.1);
-  border-radius: 20px;
-  padding: 1px 8px;
-  font-size: 11px;
+/* =============================================
+   KANBAN OCORRÊNCIAS — cabeçalhos
+   ============================================= */
+.status-aberta {
+  background: rgba(230,126,34,0.15);
+  color: var(--kanban-oc-aberta);
+  border-bottom: 2px solid rgba(230,126,34,0.3);
 }
 
-.kanban-cards {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.status-em-andamento {
+  background: rgba(41,128,185,0.15);
+  color: var(--kanban-oc-andamento);
+  border-bottom: 2px solid rgba(41,128,185,0.3);
 }
 
-/* Scrollbar discreta */
-.kanban-cards::-webkit-scrollbar { width: 4px; }
-.kanban-cards::-webkit-scrollbar-track { background: transparent; }
-.kanban-cards::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+.status-encerrada {
+  background: rgba(39,174,96,0.15);
+  color: var(--kanban-oc-encerrada);
+  border-bottom: 2px solid rgba(39,174,96,0.3);
+}
 
-/* Card de ocorrência */
+/* =============================================
+   KANBAN MANUTENÇÕES — cabeçalhos
+   ============================================= */
+.status-pendente {
+  background: rgba(142,68,173,0.15);
+  color: var(--kanban-mn-pendente);
+  border-bottom: 2px solid rgba(142,68,173,0.3);
+}
+
+.status-concluida {
+  background: rgba(39,174,96,0.15);
+  color: var(--kanban-mn-concluida);
+  border-bottom: 2px solid rgba(39,174,96,0.3);
+}
+
+.status-inativa {
+  background: rgba(192,57,43,0.15);
+  color: var(--kanban-mn-inativa);
+  border-bottom: 2px solid rgba(192,57,43,0.3);
+}
+
+/* =============================================
+   CARDS — ocorrências
+   ============================================= */
 .kanban-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -302,15 +408,35 @@ body {
   border-left: 3px solid transparent;
 }
 
-.kanban-card:hover {
-  border-color: var(--color-primary);
+.kanban-ocorrencias .kanban-card:hover {
+  border-color: var(--kanban-oc-card-accent);
   transform: translateY(-1px);
 }
 
-.kanban-card.prioridade-critica  { border-left-color: var(--color-critica); }
-.kanban-card.prioridade-alta     { border-left-color: var(--color-alta); }
-.kanban-card.prioridade-media    { border-left-color: var(--color-media); }
-.kanban-card.prioridade-baixa    { border-left-color: var(--color-baixa); }
+/* Cards de manutenção — visual levemente diferente */
+.kanban-manutencao .kanban-card {
+  background: var(--color-surface-2);
+  border-color: rgba(142,68,173,0.2);
+  border-left: 3px solid var(--kanban-mn-pendente);
+}
+
+.kanban-manutencao .kanban-card:hover {
+  border-color: var(--kanban-mn-pendente);
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(142,68,173,0.3);
+}
+
+/* Prioridades — só nos cards de ocorrência */
+.kanban-card.prioridade-critica { border-left-color: var(--color-critica); }
+.kanban-card.prioridade-alta    { border-left-color: var(--color-alta); }
+.kanban-card.prioridade-media   { border-left-color: var(--color-media); }
+.kanban-card.prioridade-baixa   { border-left-color: var(--color-baixa); }
+
+/* Card com solicitação de encerramento */
+.card-solicitacao {
+  background: rgba(231,76,60,0.05);
+  border-color: rgba(231,76,60,0.3) !important;
+}
 
 .card-tipo {
   font-size: 11px;
@@ -319,6 +445,14 @@ body {
   letter-spacing: 0.5px;
   color: var(--color-text-muted);
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Tipo nos cards de manutenção — cor roxa */
+.kanban-manutencao .card-tipo {
+  color: var(--kanban-mn-pendente);
 }
 
 .card-desc {
@@ -328,7 +462,7 @@ body {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  line-clamp: 2; 
+  line-clamp: 2;
   overflow: hidden;
 }
 
@@ -346,6 +480,26 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.col-count {
+  background: rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.kanban-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-cards::-webkit-scrollbar { width: 4px; }
+.kanban-cards::-webkit-scrollbar-track { background: transparent; }
+.kanban-cards::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
 
 /* =============================================
    BADGES
@@ -384,9 +538,7 @@ body {
   transition: background 0.2s;
 }
 
-.btn-primary:hover {
-  background: var(--color-primary-dark);
-}
+.btn-primary:hover { background: var(--color-primary-dark); }
 
 .btn-secondary {
   padding: 6px 14px;
@@ -415,16 +567,14 @@ body {
   transition: all 0.2s;
 }
 
-.btn-danger:hover {
-  background: rgba(231,76,60,0.1);
-}
+.btn-danger:hover { background: rgba(231,76,60,0.1); }
 
 /* =============================================
-   GRID DE RECURSOS (seção inferior do Comandante)
+   GRID DE RECURSOS
    ============================================= */
 .resources-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 20px;
 }
 
@@ -433,6 +583,7 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  min-height: 200px;
 }
 
 .resource-card-header {
@@ -474,13 +625,8 @@ body {
   color: var(--color-text);
 }
 
-.data-table tr:last-child td {
-  border-bottom: none;
-}
-
-.data-table tr:hover td {
-  background: var(--color-surface-2);
-}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--color-surface-2); }
 
 /* =============================================
    MODAL
@@ -496,9 +642,7 @@ body {
   padding: 24px;
 }
 
-.modal-overlay.hidden {
-  display: none;
-}
+.modal-overlay.hidden { display: none; }
 
 .modal {
   background: var(--color-surface);
@@ -535,18 +679,11 @@ body {
   transition: color 0.2s;
 }
 
-.modal-close:hover {
-  color: var(--color-text);
-}
+.modal-close:hover { color: var(--color-text); }
 
-.modal-body {
-  padding: 20px;
-}
+.modal-body { padding: 20px; }
 
-/* Formulários dentro do modal */
-.form-group {
-  margin-bottom: 16px;
-}
+.form-group { margin-bottom: 16px; }
 
 .form-group label {
   display: block;
@@ -600,7 +737,7 @@ body {
 }
 
 /* =============================================
-   TOAST (notificações)
+   TOAST
    ============================================= */
 #toast-container {
   position: fixed;
@@ -645,51 +782,61 @@ body {
 }
 
 @media (max-width: 1100px) {
-  .tecnico-layout {
-    grid-template-columns: 1fr;
-  }
+  .tecnico-layout { grid-template-columns: 1fr; }
 }
-
-.kanban-manutencao .kanban-board {
-  height: 500px;
-}
-
-/* Status de manutenção */
-.status-pendente    { background: rgba(139,144,160,0.15); color: var(--color-text-muted); }
-.status-concluida   { background: rgba(39,174,96,0.15);   color: var(--color-encerrada); }
 
 /* =============================================
-   SEÇÃO DO CIDADÃO
+   PORTAL DO CIDADÃO
    ============================================= */
-.cidadao-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-@media (max-width: 900px) {
-  .cidadao-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 .cidadao-form-card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid #1a4a3a;
   border-radius: var(--radius-lg);
-  padding: 24px;
+  border-top: 3px solid #27ae60;
+  padding: 32px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .cidadao-form-card h2 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  color: #2ecc71;
 }
 
 .cidadao-form-card p {
   color: var(--color-text-muted);
   font-size: 13px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+/* Mensagem de sucesso do cidadão */
+.cidadao-sucesso {
+  text-align: center;
+  padding: 48px 24px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.cidadao-sucesso-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.cidadao-sucesso h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2ecc71;
+  margin-bottom: 8px;
+}
+
+.cidadao-sucesso p {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.6;
 }
 
 /* =============================================
@@ -708,16 +855,4 @@ body {
   padding: 32px 16px;
   color: var(--color-text-muted);
   font-size: 13px;
-}
-
-/* Status inativa — manutenção */
-.status-inativa { background: rgba(231,76,60,0.15); color: var(--color-critica); }
-
-/* FIX 1/5: altura mínima nos resource cards para conteúdo não ser cortado */
-.resource-card {
-  min-height: 200px;
-}
-
-.resources-grid {
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
 }

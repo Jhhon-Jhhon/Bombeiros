@@ -9,7 +9,8 @@
 </head>
 <body>
 
-  <header class="topbar">
+  <!-- TOPBAR: Sistema Interno -->
+  <header class="topbar" id="topbar-interno">
     <div class="topbar-brand">
       <span class="brand-icon">🔥</span>
       <span class="brand-name">Bombeiros DF</span>
@@ -18,82 +19,100 @@
       <button class="profile-btn active" data-profile="comandante">Comandante</button>
       <button class="profile-btn" data-profile="tecnico">Técnico de Manutenção</button>
       <button class="profile-btn" data-profile="bombeiro">Bombeiro</button>
-      <button class="profile-btn" data-profile="cidadao">Cidadão</button>
     </nav>
+    <button class="btn-portal-cidadao" onclick="abrirPortalCidadao()">
+      🏛️ Portal do Cidadão
+    </button>
+  </header>
+
+  <!-- TOPBAR: Portal do Cidadão -->
+  <header class="topbar topbar-cidadao hidden" id="topbar-cidadao">
+    <div class="topbar-brand">
+      <span class="brand-icon">🏛️</span>
+      <span class="brand-name">Portal do Cidadão — Bombeiros DF</span>
+    </div>
+    <button class="btn-voltar-sistema" onclick="voltarSistema()">
+      ← Voltar ao sistema
+    </button>
   </header>
 
   <main class="main-content">
 
-    <!-- VIEW: COMANDANTE -->
-    <section id="view-comandante" class="view active">
-      <div class="view-header">
-        <h1>Painel do Comandante</h1>
-        <p class="view-subtitle">Gerencie ocorrências, equipes e recursos</p>
-      </div>
-      <div class="commander-layout">
-        <div class="map-panel">
-          <div class="panel-header">
-            <span class="panel-title">Ocorrências em campo</span>
-            <span id="map-count" class="badge badge-info">carregando...</span>
-          </div>
-          <div id="map"></div>
+    <!-- VIEWS INTERNAS -->
+    <div id="views-interno">
+
+      <!-- VIEW: COMANDANTE -->
+      <section id="view-comandante" class="view active">
+        <div class="view-header">
+          <h1>Painel do Comandante</h1>
+          <p class="view-subtitle">Gerencie ocorrências, equipes e recursos</p>
         </div>
-        <div class="kanban-panel">
-          <div class="panel-header">
-            <span class="panel-title">Kanban de ocorrências</span>
-            <button class="btn-primary" id="btn-nova-ocorrencia">+ Nova</button>
+        <div class="commander-layout">
+          <div class="map-panel">
+            <div class="panel-header">
+              <span class="panel-title">Ocorrências em campo</span>
+              <span id="map-count" class="badge badge-info">carregando...</span>
+            </div>
+            <div id="map"></div>
           </div>
-          <div class="kanban-board" id="kanban-ocorrencias">
-            <div class="kanban-col">
-              <div class="kanban-col-header status-aberta">
-                Aberta <span class="col-count" id="count-aberta">0</span>
-              </div>
-              <div class="kanban-cards" id="col-aberta"></div>
+          <div class="kanban-panel kanban-ocorrencias">
+            <div class="panel-header">
+              <span class="panel-title">Kanban de ocorrências</span>
+              <button class="btn-primary" id="btn-nova-ocorrencia">+ Nova</button>
             </div>
-            <div class="kanban-col">
-              <div class="kanban-col-header status-em-andamento">
-                Em andamento <span class="col-count" id="count-em-andamento">0</span>
+            <div class="kanban-board" id="kanban-ocorrencias">
+              <div class="kanban-col">
+                <div class="kanban-col-header status-aberta">
+                  Aberta <span class="col-count" id="count-aberta">0</span>
+                </div>
+                <div class="kanban-cards" id="col-aberta"></div>
               </div>
-              <div class="kanban-cards" id="col-em-andamento"></div>
-            </div>
-            <div class="kanban-col">
-              <div class="kanban-col-header status-encerrada">
-                Encerrada <span class="col-count" id="count-encerrada">0</span>
+              <div class="kanban-col">
+                <div class="kanban-col-header status-em-andamento">
+                  Em andamento <span class="col-count" id="count-em-andamento">0</span>
+                </div>
+                <div class="kanban-cards" id="col-em-andamento"></div>
               </div>
-              <div class="kanban-cards" id="col-encerrada"></div>
+              <div class="kanban-col">
+                <div class="kanban-col-header status-encerrada">
+                  Encerrada <span class="col-count" id="count-encerrada">0</span>
+                </div>
+                <div class="kanban-cards" id="col-encerrada"></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="resources-grid" id="resources-grid"></div>
-    </section>
+        <div class="resources-grid" id="resources-grid"></div>
+      </section>
 
-    <!-- VIEW: TÉCNICO -->
-    <section id="view-tecnico" class="view">
-      <div class="view-header">
-        <h1>Painel do Técnico de Manutenção</h1>
-        <p class="view-subtitle">Gerencie manutenções de viaturas e equipamentos</p>
-      </div>
-      <div id="tecnico-content"></div>
-    </section>
+      <!-- VIEW: TÉCNICO -->
+      <section id="view-tecnico" class="view">
+        <div class="view-header">
+          <h1>Painel do Técnico de Manutenção</h1>
+          <p class="view-subtitle">Gerencie manutenções de viaturas e equipamentos</p>
+        </div>
+        <div id="tecnico-content"></div>
+      </section>
 
-    <!-- VIEW: BOMBEIRO -->
-    <section id="view-bombeiro" class="view">
-      <div class="view-header">
-        <h1>Painel do Bombeiro</h1>
-        <p class="view-subtitle">Registre e acompanhe ocorrências e treinamentos</p>
-      </div>
-      <div id="bombeiro-content"></div>
-    </section>
+      <!-- VIEW: BOMBEIRO -->
+      <section id="view-bombeiro" class="view">
+        <div class="view-header">
+          <h1>Painel do Bombeiro</h1>
+          <p class="view-subtitle">Registre e acompanhe ocorrências e treinamentos</p>
+        </div>
+        <div id="bombeiro-content"></div>
+      </section>
 
-    <!-- VIEW: CIDADÃO -->
-    <section id="view-cidadao" class="view">
-      <div class="view-header">
+    </div>
+
+    <!-- PORTAL DO CIDADÃO (separado) -->
+    <div id="view-cidadao" class="hidden">
+      <div class="view-header cidadao-header">
         <h1>Portal do Cidadão</h1>
-        <p class="view-subtitle">Registre denúncias e acompanhe ocorrências</p>
+        <p class="view-subtitle">Registre uma denúncia para análise dos bombeiros</p>
       </div>
       <div id="cidadao-content"></div>
-    </section>
+    </div>
 
   </main>
 

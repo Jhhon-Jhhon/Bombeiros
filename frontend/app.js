@@ -15,9 +15,25 @@ function inicializarSeletorPerfil() {
       if (perfil === 'comandante') carregarViewComandante();
       if (perfil === 'tecnico')    carregarViewTecnico();
       if (perfil === 'bombeiro')   carregarViewBombeiro();
-      if (perfil === 'cidadao')    carregarViewCidadao();
     });
   });
+}
+
+// Abre o portal do cidadão (topbar e view separados)
+function abrirPortalCidadao() {
+  document.getElementById('topbar-interno').classList.add('hidden');
+  document.getElementById('topbar-cidadao').classList.remove('hidden');
+  document.getElementById('views-interno').classList.add('hidden');
+  document.getElementById('view-cidadao').classList.remove('hidden');
+  carregarViewCidadao();
+}
+
+// Volta ao sistema interno
+function voltarSistema() {
+  document.getElementById('topbar-cidadao').classList.add('hidden');
+  document.getElementById('topbar-interno').classList.remove('hidden');
+  document.getElementById('view-cidadao').classList.add('hidden');
+  document.getElementById('views-interno').classList.remove('hidden');
 }
 
 // =============================================
@@ -66,7 +82,8 @@ async function carregarRecursosComandante() {
       [
         { label: 'ID', key: 'id' }, { label: 'Nome', key: 'nome' },
         { label: 'Tipo', key: 'tipo' }, { label: 'Status', render: badgeStatusEquipamento },
-      ], {}
+      ],
+      { onEditar: (e) => abrirModalComandanteEquipamento(e) }
     ));
 
     grid.appendChild(criarResourceCard('Equipes', equipes,
@@ -340,6 +357,78 @@ async function confirmarSolicitacaoManutencao(viaturaId) {
     await Viaturas.atualizar(viaturaId, { status: 'em_manutencao' });
     closeModal();
     showToast('Manutencao solicitada! Viatura marcada como em manutencao.', 'success');
+    await carregarRecursosComandante();
+  } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
+}
+
+// =============================================
+// MODAIS COMANDANTE — Equipamento
+// =============================================
+
+function abrirModalComandanteEquipamento(e) {
+  const statusLabel = {
+    disponivel: 'Disponivel', em_uso: 'Em uso',
+    em_manutencao: 'Em manutencao', inativo: 'Inativo',
+  }[e.status] ?? e.status;
+  const corStatus = {
+    disponivel: 'var(--color-encerrada)',
+    em_uso: 'var(--color-info)',
+    em_manutencao: 'var(--color-alta)',
+    inativo: 'var(--color-text-muted)',
+  }[e.status] ?? 'var(--color-text-muted)';
+  const podeSolicitar = e.status === 'disponivel';
+
+  openModal(`Equipamento #${e.id} — ${e.nome}`, `
+    <div class="form-row">
+      <div class="form-group"><label>Nome</label><input type="text" value="${e.nome}" disabled /></div>
+      <div class="form-group"><label>Tipo</label><input type="text" value="${e.tipo}" disabled /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Numero de serie</label>
+        <input type="text" value="${e.numero_serie ?? '--'}" disabled />
+      </div>
+      <div class="form-group"><label>Status (definido pelo Tecnico)</label>
+        <input type="text" value="${statusLabel}" disabled style="color:${corStatus};font-weight:600;" />
+      </div>
+    </div>
+    ${!podeSolicitar ? `<p class="text-muted" style="font-size:12px;">Equipamento indisponivel para manutencao (status: ${statusLabel}).</p>` : ''}
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+      ${podeSolicitar ? `<button class="btn-primary" style="background:var(--color-alta);"
+        onclick="solicitarManutencaoEquipamento(${e.id},'${e.nome.replace(/'/g, "\'")}')">Solicitar manutencao</button>` : ''}
+    </div>`);
+}
+
+async function solicitarManutencaoEquipamento(equipamentoId, nome) {
+  openModal(`Solicitar manutencao — ${nome}`, `
+    <div class="form-group"><label>Tipo</label>
+      <select id="sol-eq-tipo">
+        <option value="preventiva">Preventiva</option>
+        <option value="corretiva">Corretiva</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Descricao</label>
+      <textarea id="sol-eq-desc" rows="3" placeholder="Descreva o motivo..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarSolicitacaoManutencaoEquipamento(${equipamentoId})">Solicitar</button>
+    </div>`);
+}
+
+async function confirmarSolicitacaoManutencaoEquipamento(equipamentoId) {
+  const tipo = document.getElementById('sol-eq-tipo').value;
+  const descricao = document.getElementById('sol-eq-desc').value;
+  if (!descricao) { showToast('Informe a descricao.', 'error'); return; }
+  try {
+    await Manutencoes.criar({
+      tipo, descricao,
+      equipamento_id: equipamentoId,
+      data_inicio: new Date().toISOString().split('T')[0],
+    });
+    await Equipamentos.atualizar(equipamentoId, { status: 'em_manutencao' });
+    closeModal();
+    showToast('Manutencao solicitada! Equipamento marcado como em manutencao.', 'success');
     await carregarRecursosComandante();
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
@@ -1080,15 +1169,88 @@ async function carregarViaturasBombeiro() {
       const equipsHtml = v.equipamentos.length > 0
         ? v.equipamentos.map((e) => `<span class="badge badge-muted" style="margin:2px;">${e.nome??`Equip #${e.equipamento_id}`}</span>`).join('')
         : '<span class="text-muted" style="font-size:12px;">Sem equipamentos alocados</span>';
-      return `<div style="padding:12px 0;border-bottom:1px solid var(--color-border);">
+      return `<div style="padding:12px 0;border-bottom:1px solid var(--color-border);cursor:pointer;transition:background 0.15s;"
+        onclick="abrirModalViaturaBombeiro(${v.id})"
+        onmouseover="this.style.background='var(--color-surface-2)'"
+        onmouseout="this.style.background='transparent'">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <strong>${v.placa}</strong><span class="badge badge-success">Disponivel</span>
+          <strong>${v.placa}</strong>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-success">Disponivel</span>
+            <span style="font-size:11px;color:var(--color-text-muted);">Ver detalhes →</span>
+          </div>
         </div>
         <div style="font-size:13px;color:var(--color-text-muted);margin-bottom:4px;">${v.modelo}</div>
         <div style="font-size:12px;">${equipsHtml}</div>
       </div>`;
     }).join('');
   } catch (erro) { container.innerHTML = '<div class="empty-state">Erro ao carregar viaturas.</div>'; }
+}
+
+// Modal de detalhes da viatura para o Bombeiro (somente leitura)
+async function abrirModalViaturaBombeiro(viaturaId) {
+  openModal('Detalhes da viatura', '<div class="empty-state">Carregando...</div>');
+  try {
+    const [viaturas, equipsViatura, todosEquipamentos] = await Promise.all([
+      Viaturas.listar(),
+      Viaturas.listarEquipamentos(viaturaId).catch(() => []),
+      Equipamentos.listar().catch(() => []),
+    ]);
+    const v = viaturas.find((x) => x.id === viaturaId);
+    if (!v) { document.getElementById('modal-body').innerHTML = '<div class="empty-state">Viatura nao encontrada.</div>'; return; }
+
+    const tipoLabel = {
+      auto_bomba: 'Auto Bomba', auto_escada: 'Auto Escada',
+      ambulancia: 'Ambulancia', veiculo_leve: 'Veiculo Leve',
+    }[v.tipo] ?? v.tipo;
+
+    // Enriquecer com nome real buscando em todosEquipamentos pelo equipamento_id
+    const equipsEnriquecidos = equipsViatura.map((ve) => {
+      const detalhes = todosEquipamentos.find((eq) => eq.id === ve.equipamento_id);
+      return { ...ve, nome: detalhes?.nome ?? null, tipo: detalhes?.tipo ?? null, status: detalhes?.status ?? ve.status };
+    });
+    const equipsDisponiveis = equipsEnriquecidos.filter((e) => e.status !== 'em_manutencao');
+    const listaEquipamentos = equipsDisponiveis.length > 0
+      ? equipsDisponiveis.map((e) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;
+            padding:8px 0;border-bottom:1px solid var(--color-border);">
+            <div>
+              <span style="font-weight:600;">${e.nome ?? 'Equipamento #' + e.equipamento_id}</span>
+              ${e.tipo ? `<span class="badge badge-muted" style="margin-left:8px;">${e.tipo}</span>` : ''}
+            </div>
+            <span class="badge badge-info">Em uso</span>
+          </div>`).join('')
+      : '<div class="empty-state" style="padding:16px;">Nenhum equipamento alocado nesta viatura.</div>';
+
+    document.getElementById('modal-title').textContent = `Viatura — ${v.placa}`;
+    document.getElementById('modal-body').innerHTML = `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Placa</label>
+          <input type="text" value="${v.placa}" disabled />
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <input type="text" value="${tipoLabel}" disabled />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Modelo</label>
+        <input type="text" value="${v.modelo}" disabled />
+      </div>
+      ${v.ano_fabricacao ? `<div class="form-group"><label>Ano de fabricacao</label><input type="text" value="${v.ano_fabricacao}" disabled /></div>` : ''}
+      <div class="form-group" style="margin-top:16px;">
+        <label>Equipamentos alocados (${equipsDisponiveis.length})</label>
+        <div style="border:1px solid var(--color-border);border-radius:8px;max-height:200px;overflow-y:auto;">
+          ${listaEquipamentos}
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" onclick="closeModal()">Fechar</button>
+      </div>`;
+  } catch (erro) {
+    document.getElementById('modal-body').innerHTML = '<div class="empty-state">Erro ao carregar detalhes.</div>';
+  }
 }
 
 async function carregarTabelaTreinamentosBombeiro() {
@@ -1558,55 +1720,23 @@ async function carregarViewCidadao() {
   const container = document.getElementById('cidadao-content');
   if (!container) return;
   container.innerHTML = `
-    <div class="cidadao-layout">
-      <div class="cidadao-form-card">
-        <h2>Registrar denuncia</h2>
-        <p>Informe uma situacao de risco para analise dos bombeiros.</p>
-        <div class="form-group"><label>Seu nome</label><input type="text" id="den-nome" placeholder="Nome completo" /></div>
-        <div class="form-group"><label>Telefone</label><input type="text" id="den-telefone" placeholder="61999990000" /></div>
-        <div class="form-group"><label>Tipo de ocorrencia</label>
-          <select id="den-tipo">
-            <option value="incendio">Incendio</option><option value="acidente">Acidente</option>
-            <option value="inundacao">Inundacao</option><option value="outros">Outros</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Endereco</label><input type="text" id="den-endereco" placeholder="Ex: SQN 210, Bloco B" /></div>
-        <div class="form-group"><label>Descricao</label><textarea id="den-descricao" rows="3" placeholder="Descreva..."></textarea></div>
-        <button class="btn-primary" style="width:100%" onclick="enviarDenuncia()">Enviar denuncia</button>
+    <div class="cidadao-form-card">
+      <h2>Registrar denuncia</h2>
+      <p>Preencha o formulario abaixo para enviar uma denuncia aos bombeiros. Nossa equipe ira analisa-la o mais breve possivel.</p>
+      <div class="form-group"><label>Seu nome</label><input type="text" id="den-nome" placeholder="Nome completo" /></div>
+      <div class="form-group"><label>Telefone</label><input type="text" id="den-telefone" placeholder="61999990000" /></div>
+      <div class="form-group"><label>Tipo de ocorrencia</label>
+        <select id="den-tipo">
+          <option value="incendio">Incendio</option>
+          <option value="acidente">Acidente</option>
+          <option value="inundacao">Inundacao</option>
+          <option value="outros">Outros</option>
+        </select>
       </div>
-      <div class="cidadao-form-card">
-        <h2>Ocorrencias recentes</h2>
-        <p>Acompanhe o status das ocorrencias em Brasilia.</p>
-        <div id="cidadao-ocorrencias"><div class="empty-state">Carregando...</div></div>
-      </div>
+      <div class="form-group"><label>Endereco</label><input type="text" id="den-endereco" placeholder="Ex: SQN 210, Bloco B" /></div>
+      <div class="form-group"><label>Descricao</label><textarea id="den-descricao" rows="4" placeholder="Descreva a situacao de risco com o maximo de detalhes possivel..."></textarea></div>
+      <button class="btn-primary" style="width:100%;padding:12px;font-size:15px;" onclick="enviarDenuncia()">Enviar denuncia</button>
     </div>`;
-  await carregarOcorrenciasCidadao();
-}
-
-async function carregarOcorrenciasCidadao() {
-  const container = document.getElementById('cidadao-ocorrencias');
-  if (!container) return;
-  try {
-    const todas = await Ocorrencias.listar();
-    const ocorrencias = todas.filter((oc) => oc.status !== 'encerrada');
-    const tabela = criarTabela(
-      [
-        { label:'Tipo',key:'tipo' },
-        { label:'Local', render:(oc)=>oc.endereco?.bairro??'--' },
-        { label:'Status', render:(oc)=>{
-          const m={aberta:{c:'badge-warning',l:'Aberta'},em_andamento:{c:'badge-info',l:'Em andamento'},encerrada:{c:'badge-success',l:'Encerrada'}};
-          const {c,l}=m[oc.status]??{c:'badge-muted',l:oc.status};
-          return `<span class="badge ${c}">${l}</span>`;
-        }},
-        { label:'Prioridade', render:(oc)=>{
-          const m={critica:{c:'badge-critica',l:'Critica'},alta:{c:'badge-alta',l:'Alta'},media:{c:'badge-media',l:'Media'},baixa:{c:'badge-baixa',l:'Baixa'}};
-          const {c,l}=m[oc.prioridade]??{c:'badge-muted',l:oc.prioridade};
-          return `<span class="badge ${c}">${l}</span>`;
-        }},
-      ], ocorrencias
-    );
-    container.innerHTML = ''; container.appendChild(tabela);
-  } catch (erro) { container.innerHTML = '<div class="empty-state">Erro ao carregar ocorrencias.</div>'; }
 }
 
 async function enviarDenuncia() {
@@ -1621,8 +1751,22 @@ async function enviarDenuncia() {
     showToast('Preencha nome, endereco e descricao.', 'error'); return;
   }
   try {
-    await Denuncias.criar(dados); showToast('Denuncia enviada!', 'success');
-    ['den-nome','den-telefone','den-endereco','den-descricao'].forEach((id) => { document.getElementById(id).value = ''; });
+    await Denuncias.criar(dados);
+    // Exibe mensagem de sucesso no lugar do formulario
+    const container = document.getElementById('cidadao-content');
+    container.innerHTML = `
+      <div class="cidadao-sucesso">
+        <span class="cidadao-sucesso-icon">✅</span>
+        <h2>Denuncia enviada com sucesso!</h2>
+        <p>
+          Obrigado, <strong>${dados.solicitante}</strong>. Sua denuncia foi registrada e sera analisada
+          pela equipe do Corpo de Bombeiros DF em breve.<br><br>
+          Caso a situacao seja de emergencia imediata, ligue <strong>193</strong>.
+        </p>
+        <button class="btn-primary" style="padding:10px 32px;font-size:14px;" onclick="carregarViewCidadao()">
+          Registrar outra denuncia
+        </button>
+      </div>`;
   } catch (erro) { showToast(`Erro: ${erro.message}`, 'error'); }
 }
 
