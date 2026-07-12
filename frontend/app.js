@@ -715,7 +715,11 @@ async function atualizarDenuncia(id) {
       showToast('Denuncia aprovada! Bombeiro pode registrar a ocorrencia.', 'success');
       closeModal(); await carregarRecursosComandante();
     } else if (novoStatus === 'arquivada') {
-      showToast('Denuncia arquivada!', 'success');
+      await Solicitacoes.criar({
+        denuncia_id: id, comandante_id: 1, tipo: 'ocorrencia', prioridade: 'baixa',
+        observacao: 'Denuncia arquivada pelo Comandante.',
+      });
+      showToast('Denuncia arquivada! Solicitacao registrada.', 'success');
       closeModal(); await carregarRecursosComandante();
     } else {
       showToast('Denuncia atualizada!', 'success');
